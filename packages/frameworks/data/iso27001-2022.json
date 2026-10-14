@@ -1,0 +1,478 @@
+{
+  "id": "iso27001-2022",
+  "name": "ISO/IEC 27001:2022 — Anexo A",
+  "version": "2022",
+  "domains": {
+    "organizacional": "Controles organizacionales",
+    "personas": "Controles de personas",
+    "fisico": "Controles físicos",
+    "tecnologico": "Controles tecnológicos"
+  },
+  "controls": [
+    {
+      "id": "A.5.1",
+      "domain": "organizacional",
+      "title": "Políticas de seguridad de la información"
+    },
+    {
+      "id": "A.5.2",
+      "domain": "organizacional",
+      "title": "Roles y responsabilidades de seguridad de la información"
+    },
+    {
+      "id": "A.5.3",
+      "domain": "organizacional",
+      "title": "Segregación de funciones"
+    },
+    {
+      "id": "A.5.4",
+      "domain": "organizacional",
+      "title": "Responsabilidades de la dirección"
+    },
+    {
+      "id": "A.5.5",
+      "domain": "organizacional",
+      "title": "Contacto con autoridades"
+    },
+    {
+      "id": "A.5.6",
+      "domain": "organizacional",
+      "title": "Contacto con grupos de interés especial"
+    },
+    {
+      "id": "A.5.7",
+      "domain": "organizacional",
+      "title": "Inteligencia de amenazas"
+    },
+    {
+      "id": "A.5.8",
+      "domain": "organizacional",
+      "title": "Seguridad de la información en la gestión de proyectos"
+    },
+    {
+      "id": "A.5.9",
+      "domain": "organizacional",
+      "title": "Inventario de información y otros activos asociados"
+    },
+    {
+      "id": "A.5.10",
+      "domain": "organizacional",
+      "title": "Uso aceptable de la información y otros activos"
+    },
+    {
+      "id": "A.5.11",
+      "domain": "organizacional",
+      "title": "Devolución de activos"
+    },
+    {
+      "id": "A.5.12",
+      "domain": "organizacional",
+      "title": "Clasificación de la información"
+    },
+    {
+      "id": "A.5.13",
+      "domain": "organizacional",
+      "title": "Etiquetado de la información"
+    },
+    {
+      "id": "A.5.14",
+      "domain": "organizacional",
+      "title": "Transferencia de información"
+    },
+    {
+      "id": "A.5.15",
+      "domain": "organizacional",
+      "title": "Control de acceso"
+    },
+    {
+      "id": "A.5.16",
+      "domain": "organizacional",
+      "title": "Gestión de identidades"
+    },
+    {
+      "id": "A.5.17",
+      "domain": "organizacional",
+      "title": "Información de autenticación"
+    },
+    {
+      "id": "A.5.18",
+      "domain": "organizacional",
+      "title": "Derechos de acceso"
+    },
+    {
+      "id": "A.5.19",
+      "domain": "organizacional",
+      "title": "Seguridad de la información en las relaciones con proveedores"
+    },
+    {
+      "id": "A.5.20",
+      "domain": "organizacional",
+      "title": "Seguridad de la información en los acuerdos con proveedores"
+    },
+    {
+      "id": "A.5.21",
+      "domain": "organizacional",
+      "title": "Gestión de la seguridad en la cadena de suministro de TIC"
+    },
+    {
+      "id": "A.5.22",
+      "domain": "organizacional",
+      "title": "Seguimiento, revisión y gestión de cambios de los servicios de proveedores"
+    },
+    {
+      "id": "A.5.23",
+      "domain": "organizacional",
+      "title": "Seguridad de la información en el uso de servicios en la nube"
+    },
+    {
+      "id": "A.5.24",
+      "domain": "organizacional",
+      "title": "Planificación y preparación de la gestión de incidentes"
+    },
+    {
+      "id": "A.5.25",
+      "domain": "organizacional",
+      "title": "Evaluación y decisión sobre eventos de seguridad"
+    },
+    {
+      "id": "A.5.26",
+      "domain": "organizacional",
+      "title": "Respuesta a incidentes de seguridad"
+    },
+    {
+      "id": "A.5.27",
+      "domain": "organizacional",
+      "title": "Aprendizaje de los incidentes de seguridad"
+    },
+    {
+      "id": "A.5.28",
+      "domain": "organizacional",
+      "title": "Recopilación de evidencias"
+    },
+    {
+      "id": "A.5.29",
+      "domain": "organizacional",
+      "title": "Seguridad de la información durante una interrupción"
+    },
+    {
+      "id": "A.5.30",
+      "domain": "organizacional",
+      "title": "Preparación de las TIC para la continuidad del negocio"
+    },
+    {
+      "id": "A.5.31",
+      "domain": "organizacional",
+      "title": "Requisitos legales, regulatorios y contractuales"
+    },
+    {
+      "id": "A.5.32",
+      "domain": "organizacional",
+      "title": "Derechos de propiedad intelectual"
+    },
+    {
+      "id": "A.5.33",
+      "domain": "organizacional",
+      "title": "Protección de registros"
+    },
+    {
+      "id": "A.5.34",
+      "domain": "organizacional",
+      "title": "Privacidad y protección de datos personales"
+    },
+    {
+      "id": "A.5.35",
+      "domain": "organizacional",
+      "title": "Revisión independiente de la seguridad de la información"
+    },
+    {
+      "id": "A.5.36",
+      "domain": "organizacional",
+      "title": "Cumplimiento de políticas, reglas y normas de seguridad"
+    },
+    {
+      "id": "A.5.37",
+      "domain": "organizacional",
+      "title": "Procedimientos operativos documentados"
+    },
+    {
+      "id": "A.6.1",
+      "domain": "personas",
+      "title": "Selección de personal"
+    },
+    {
+      "id": "A.6.2",
+      "domain": "personas",
+      "title": "Términos y condiciones de empleo"
+    },
+    {
+      "id": "A.6.3",
+      "domain": "personas",
+      "title": "Concientización, educación y formación en seguridad"
+    },
+    {
+      "id": "A.6.4",
+      "domain": "personas",
+      "title": "Proceso disciplinario"
+    },
+    {
+      "id": "A.6.5",
+      "domain": "personas",
+      "title": "Responsabilidades tras la terminación o cambio de empleo"
+    },
+    {
+      "id": "A.6.6",
+      "domain": "personas",
+      "title": "Acuerdos de confidencialidad"
+    },
+    {
+      "id": "A.6.7",
+      "domain": "personas",
+      "title": "Trabajo remoto"
+    },
+    {
+      "id": "A.6.8",
+      "domain": "personas",
+      "title": "Reporte de eventos de seguridad"
+    },
+    {
+      "id": "A.7.1",
+      "domain": "fisico",
+      "title": "Perímetros de seguridad física"
+    },
+    {
+      "id": "A.7.2",
+      "domain": "fisico",
+      "title": "Ingreso físico"
+    },
+    {
+      "id": "A.7.3",
+      "domain": "fisico",
+      "title": "Seguridad de oficinas, salas e instalaciones"
+    },
+    {
+      "id": "A.7.4",
+      "domain": "fisico",
+      "title": "Monitoreo de seguridad física"
+    },
+    {
+      "id": "A.7.5",
+      "domain": "fisico",
+      "title": "Protección contra amenazas físicas y ambientales"
+    },
+    {
+      "id": "A.7.6",
+      "domain": "fisico",
+      "title": "Trabajo en áreas seguras"
+    },
+    {
+      "id": "A.7.7",
+      "domain": "fisico",
+      "title": "Escritorio y pantalla limpios"
+    },
+    {
+      "id": "A.7.8",
+      "domain": "fisico",
+      "title": "Ubicación y protección de equipos"
+    },
+    {
+      "id": "A.7.9",
+      "domain": "fisico",
+      "title": "Seguridad de activos fuera de las instalaciones"
+    },
+    {
+      "id": "A.7.10",
+      "domain": "fisico",
+      "title": "Medios de almacenamiento"
+    },
+    {
+      "id": "A.7.11",
+      "domain": "fisico",
+      "title": "Servicios de apoyo (energía, climatización)"
+    },
+    {
+      "id": "A.7.12",
+      "domain": "fisico",
+      "title": "Seguridad del cableado"
+    },
+    {
+      "id": "A.7.13",
+      "domain": "fisico",
+      "title": "Mantenimiento de equipos"
+    },
+    {
+      "id": "A.7.14",
+      "domain": "fisico",
+      "title": "Eliminación o reutilización segura de equipos"
+    },
+    {
+      "id": "A.8.1",
+      "domain": "tecnologico",
+      "title": "Dispositivos finales de usuario"
+    },
+    {
+      "id": "A.8.2",
+      "domain": "tecnologico",
+      "title": "Derechos de acceso privilegiado"
+    },
+    {
+      "id": "A.8.3",
+      "domain": "tecnologico",
+      "title": "Restricción de acceso a la información"
+    },
+    {
+      "id": "A.8.4",
+      "domain": "tecnologico",
+      "title": "Acceso al código fuente"
+    },
+    {
+      "id": "A.8.5",
+      "domain": "tecnologico",
+      "title": "Autenticación segura"
+    },
+    {
+      "id": "A.8.6",
+      "domain": "tecnologico",
+      "title": "Gestión de la capacidad"
+    },
+    {
+      "id": "A.8.7",
+      "domain": "tecnologico",
+      "title": "Protección contra malware"
+    },
+    {
+      "id": "A.8.8",
+      "domain": "tecnologico",
+      "title": "Gestión de vulnerabilidades técnicas"
+    },
+    {
+      "id": "A.8.9",
+      "domain": "tecnologico",
+      "title": "Gestión de la configuración"
+    },
+    {
+      "id": "A.8.10",
+      "domain": "tecnologico",
+      "title": "Eliminación de información"
+    },
+    {
+      "id": "A.8.11",
+      "domain": "tecnologico",
+      "title": "Enmascaramiento de datos"
+    },
+    {
+      "id": "A.8.12",
+      "domain": "tecnologico",
+      "title": "Prevención de fuga de datos"
+    },
+    {
+      "id": "A.8.13",
+      "domain": "tecnologico",
+      "title": "Respaldo de la información"
+    },
+    {
+      "id": "A.8.14",
+      "domain": "tecnologico",
+      "title": "Redundancia de instalaciones de procesamiento"
+    },
+    {
+      "id": "A.8.15",
+      "domain": "tecnologico",
+      "title": "Registro de eventos (logging)"
+    },
+    {
+      "id": "A.8.16",
+      "domain": "tecnologico",
+      "title": "Actividades de monitoreo"
+    },
+    {
+      "id": "A.8.17",
+      "domain": "tecnologico",
+      "title": "Sincronización de relojes"
+    },
+    {
+      "id": "A.8.18",
+      "domain": "tecnologico",
+      "title": "Uso de programas utilitarios privilegiados"
+    },
+    {
+      "id": "A.8.19",
+      "domain": "tecnologico",
+      "title": "Instalación de software en sistemas operativos"
+    },
+    {
+      "id": "A.8.20",
+      "domain": "tecnologico",
+      "title": "Seguridad de redes"
+    },
+    {
+      "id": "A.8.21",
+      "domain": "tecnologico",
+      "title": "Seguridad de los servicios de red"
+    },
+    {
+      "id": "A.8.22",
+      "domain": "tecnologico",
+      "title": "Segregación de redes"
+    },
+    {
+      "id": "A.8.23",
+      "domain": "tecnologico",
+      "title": "Filtrado web"
+    },
+    {
+      "id": "A.8.24",
+      "domain": "tecnologico",
+      "title": "Uso de criptografía"
+    },
+    {
+      "id": "A.8.25",
+      "domain": "tecnologico",
+      "title": "Ciclo de vida de desarrollo seguro"
+    },
+    {
+      "id": "A.8.26",
+      "domain": "tecnologico",
+      "title": "Requisitos de seguridad de aplicaciones"
+    },
+    {
+      "id": "A.8.27",
+      "domain": "tecnologico",
+      "title": "Principios de arquitectura e ingeniería segura"
+    },
+    {
+      "id": "A.8.28",
+      "domain": "tecnologico",
+      "title": "Codificación segura"
+    },
+    {
+      "id": "A.8.29",
+      "domain": "tecnologico",
+      "title": "Pruebas de seguridad en desarrollo y aceptación"
+    },
+    {
+      "id": "A.8.30",
+      "domain": "tecnologico",
+      "title": "Desarrollo tercerizado"
+    },
+    {
+      "id": "A.8.31",
+      "domain": "tecnologico",
+      "title": "Separación de entornos de desarrollo, prueba y producción"
+    },
+    {
+      "id": "A.8.32",
+      "domain": "tecnologico",
+      "title": "Gestión de cambios"
+    },
+    {
+      "id": "A.8.33",
+      "domain": "tecnologico",
+      "title": "Información de prueba"
+    },
+    {
+      "id": "A.8.34",
+      "domain": "tecnologico",
+      "title": "Protección de sistemas durante pruebas de auditoría"
+    }
+  ]
+}

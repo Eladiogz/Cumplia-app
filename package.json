@@ -1,0 +1,26 @@
+{
+  "name": "cumplia",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Plataforma de cumplimiento (GRC) para pymes y consultores de LATAM",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r typecheck",
+    "dev:api": "pnpm --filter @cumplia/api dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0",
+    "vitest": "^2.1.8"
+  },
+  "type": "module"
+}
