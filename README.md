@@ -11,6 +11,12 @@
 - `packages/db`: PostgreSQL con Drizzle ORM, migraciones versionadas y acceso a datos **siempre acotado por organización** (`forOrganization`), con registro de auditoría en cada cambio
 - Tests de aislamiento entre organizaciones sobre Postgres real en memoria (PGlite), sin Docker
 
+### Multi-tenant: cómo se aíslan las organizaciones
+1. **Código**: todo acceso a datos de negocio pasa por `forOrganization(db, orgId)`; un recurso ajeno responde 404 (no revela que existe).
+2. **Base de datos**: FK compuestas `(id, organization_id)` entre evaluaciones, respuestas y evidencia; sesiones y desafíos MFA atados a la membresía `(user_id, organization_id)`. La base rechaza cualquier fila que mezcle organizaciones.
+3. **Auditoría inalterable**: un trigger impide `UPDATE`, `DELETE` y `TRUNCATE` sobre `audit_logs`.
+4. **Tests que se mantienen solos**: `tenant-isolation.test.ts` descubre todas las rutas protegidas y verifica que una organización no pueda leer ni modificar datos de otra. Una ruta nueva queda cubierta automáticamente.
+
 ## Empezar
 ```bash
 corepack enable

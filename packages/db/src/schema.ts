@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  foreignKey,
   index,
   integer,
   pgEnum,
@@ -15,6 +16,8 @@ import {
 /**
  * Modelo multi-tenant. Toda tabla de negocio lleva `organization_id` (aunque
  * sea redundante) y el código SIEMPRE filtra por él: defensa en profundidad.
+ * Además, las relaciones padre-hijo usan FK compuestas (id, organization_id):
+ * la base rechaza cualquier fila que mezcle datos de dos organizaciones.
  */
 export const roleEnum = pgEnum("role", ["ADMIN", "CONSULTANT", "AUDITOR"]);
 
@@ -43,6 +46,17 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const memberships = pgTable(
+  "memberships",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    organizationId: uuid("organization_id").notNull().references(() => organizations.id),
+    role: roleEnum("role").notNull(),
+  },
+  (t) => [unique("memberships_user_org_uq").on(t.userId, t.organizationId)],
+);
+
 export const mfaRecoveryCodes = pgTable(
   "mfa_recovery_codes",
   {
@@ -69,7 +83,14 @@ export const mfaChallenges = pgTable(
     attempts: integer("attempts").notNull().default(0),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },
-  (t) => [index("mfa_challenges_user_idx").on(t.userId)],
+  (t) => [
+    index("mfa_challenges_user_idx").on(t.userId),
+    foreignKey({
+      name: "mfa_challenges_membership_fk",
+      columns: [t.userId, t.organizationId],
+      foreignColumns: [memberships.userId, memberships.organizationId],
+    }).onDelete("cascade"),
+  ],
 );
 
 export const sessions = pgTable(
@@ -83,18 +104,15 @@ export const sessions = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },
-  (t) => [index("sessions_user_idx").on(t.userId)],
-);
-
-export const memberships = pgTable(
-  "memberships",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id").notNull().references(() => users.id),
-    organizationId: uuid("organization_id").notNull().references(() => organizations.id),
-    role: roleEnum("role").notNull(),
-  },
-  (t) => [unique("memberships_user_org_uq").on(t.userId, t.organizationId)],
+  (t) => [
+    index("sessions_user_idx").on(t.userId),
+    // Solo puede haber sesión donde hay membresía; quitar al miembro borra sus sesiones.
+    foreignKey({
+      name: "sessions_membership_fk",
+      columns: [t.userId, t.organizationId],
+      foreignColumns: [memberships.userId, memberships.organizationId],
+    }).onDelete("cascade"),
+  ],
 );
 
 export const assessments = pgTable(
@@ -107,6 +125,8 @@ export const assessments = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    // Destino de las FK compuestas (id, organization_id) de las tablas hijas.
+    unique("assessments_id_org_uq").on(t.id, t.organizationId),
     index("assessments_org_idx").on(t.organizationId),
     check("assessments_target_range", sql`${t.targetMaturity} between 1 and 4`),
   ],
@@ -117,15 +137,20 @@ export const controlAnswers = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     organizationId: uuid("organization_id").notNull().references(() => organizations.id),
-    assessmentId: uuid("assessment_id")
-      .notNull()
-      .references(() => assessments.id, { onDelete: "cascade" }),
+    assessmentId: uuid("assessment_id").notNull(),
     controlId: text("control_id").notNull(),
     applicable: boolean("applicable").notNull().default(true),
     maturity: integer("maturity"),
     justification: text("justification"),
   },
   (t) => [
+    // La respuesta y su evaluación son SIEMPRE de la misma organización (lo garantiza la base).
+    foreignKey({
+      name: "control_answers_assessment_org_fk",
+      columns: [t.assessmentId, t.organizationId],
+      foreignColumns: [assessments.id, assessments.organizationId],
+    }).onDelete("cascade"),
+    unique("control_answers_id_org_uq").on(t.id, t.organizationId),
     unique("control_answers_assessment_control_uq").on(t.assessmentId, t.controlId),
     index("control_answers_org_idx").on(t.organizationId),
     check("control_answers_maturity_range", sql`${t.maturity} is null or ${t.maturity} between 0 and 4`),
@@ -137,14 +162,19 @@ export const evidence = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     organizationId: uuid("organization_id").notNull().references(() => organizations.id),
-    controlAnswerId: uuid("control_answer_id")
-      .notNull()
-      .references(() => controlAnswers.id, { onDelete: "cascade" }),
+    controlAnswerId: uuid("control_answer_id").notNull(),
     source: text("source").notNull(), // manual, m365, github...
     description: text("description").notNull(),
     collectedAt: timestamp("collected_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("evidence_org_idx").on(t.organizationId)],
+  (t) => [
+    foreignKey({
+      name: "evidence_control_answer_org_fk",
+      columns: [t.controlAnswerId, t.organizationId],
+      foreignColumns: [controlAnswers.id, controlAnswers.organizationId],
+    }).onDelete("cascade"),
+    index("evidence_org_idx").on(t.organizationId),
+  ],
 );
 
 export const auditLogs = pgTable(

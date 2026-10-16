@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { createTestDb } from "./testing.js";
 import { NotFoundError, createOrganization, forOrganization } from "./repository.js";
-import { assessments } from "./schema.js";
+import { assessments, auditLogs, controlAnswers, evidence, memberships, sessions, users } from "./schema.js";
 
 let ctx: Awaited<ReturnType<typeof createTestDb>>;
 beforeAll(async () => {
@@ -105,6 +105,54 @@ describe("restricciones de la base de datos", () => {
             values (${a.id}, ${asm.id}, 'A.5.1', 9)`,
       ),
     ).rejects.toThrow();
+  });
+
+  it("impide una respuesta de una organización colgada de la evaluación de otra", async () => {
+    const { a, b } = await setup();
+    const asm = await forOrganization(ctx.db, a.id).createAssessment("iso27001-2022");
+    await expect(
+      ctx.db.insert(controlAnswers).values({ organizationId: b.id, assessmentId: asm.id, controlId: "A.5.1", maturity: 1 }),
+    ).rejects.toThrow();
+  });
+
+  it("impide evidencia de una organización sobre la respuesta de otra", async () => {
+    const { b, repoA } = await setup();
+    const asm = await repoA.createAssessment("iso27001-2022");
+    await repoA.saveAnswers(asm.id, [{ controlId: "A.5.1", applicable: true, maturity: 1 }]);
+    const [answer] = await ctx.db.select().from(controlAnswers).where(eq(controlAnswers.assessmentId, asm.id));
+    await expect(
+      ctx.db.insert(evidence).values({ organizationId: b.id, controlAnswerId: answer!.id, source: "manual", description: "x" }),
+    ).rejects.toThrow();
+  });
+
+  it("impide una sesión en una organización de la que el usuario no es miembro", async () => {
+    const { a, b } = await setup();
+    const [user] = await ctx.db.insert(users).values({ email: `s${Date.now()}@ejemplo.com` }).returning();
+    await ctx.db.insert(memberships).values({ userId: user!.id, organizationId: a.id, role: "CONSULTANT" });
+    const expiresAt = new Date(Date.now() + 60_000);
+    await expect(
+      ctx.db.insert(sessions).values({ userId: user!.id, organizationId: b.id, tokenHash: `t-${Date.now()}`, expiresAt }),
+    ).rejects.toThrow();
+
+    // Y al quitar la membresía, sus sesiones desaparecen en cascada.
+    await ctx.db.insert(sessions).values({ userId: user!.id, organizationId: a.id, tokenHash: `ok-${Date.now()}`, expiresAt });
+    await ctx.db.delete(memberships).where(eq(memberships.userId, user!.id));
+    expect(await ctx.db.select().from(sessions).where(eq(sessions.userId, user!.id))).toHaveLength(0);
+  });
+
+  it("el registro de auditoría no se puede modificar ni borrar", async () => {
+    const { repoA } = await setup();
+    await repoA.createAssessment("iso27001-2022");
+    const [entry] = await repoA.listAuditLog();
+    // drizzle envuelve el error de Postgres: el mensaje del trigger viene en `cause`.
+    const rejectedByTrigger = async (query: PromiseLike<unknown>) => {
+      const err = await Promise.resolve(query).then(() => null, (e: Error & { cause?: Error }) => e);
+      expect(err?.cause?.message ?? err?.message).toMatch(/solo agregar/);
+    };
+    await rejectedByTrigger(ctx.db.update(auditLogs).set({ action: "nada" }).where(eq(auditLogs.id, entry!.id)));
+    await rejectedByTrigger(ctx.db.delete(auditLogs).where(eq(auditLogs.id, entry!.id)));
+    await rejectedByTrigger(ctx.db.execute(sql`truncate audit_logs`));
+    expect(await repoA.listAuditLog()).toHaveLength(1);
   });
 
   it("impide un objetivo de madurez inválido", async () => {
