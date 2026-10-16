@@ -1,4 +1,4 @@
-import { createDb } from "@cumplia/db";
+import { createDb, rowLevelSecurityBypassReasons } from "@cumplia/db";
 import { buildApp } from "./app.js";
 import { parseEncryptionKey } from "./security/encryption.js";
 import { createDevTenantResolver, createSessionTenantResolver, firstOf } from "./tenant.js";
@@ -12,6 +12,15 @@ const mfaEncryptionKey = parseEncryptionKey(mfaKey);
 
 const isProd = process.env.NODE_ENV === "production";
 const { db, pool } = createDb(url);
+
+// RLS no se aplica a superusuarios ni al dueño de las tablas: en producción eso
+// dejaría el aislamiento entre organizaciones solo en manos del código.
+const rlsBypass = await rowLevelSecurityBypassReasons(db);
+if (rlsBypass.length > 0) {
+  const msg = `Row-Level Security NO se aplica a esta conexión (${rlsBypass.join("; ")}). Conectá la API con un usuario del rol cumplia_app.`;
+  if (isProd) throw new Error(msg);
+  console.warn(`ADVERTENCIA: ${msg}`);
+}
 
 // El resolver de desarrollo jamás se activa en producción.
 const devTenant = process.env.ALLOW_DEV_TENANT_HEADER === "true" && !isProd;

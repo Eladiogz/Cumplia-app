@@ -48,18 +48,48 @@ export async function createOrganization(db: Db, name: string) {
   return org;
 }
 
-type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/**
+ * Fija la organización activa para Row-Level Security, solo dentro de esta
+ * transacción (`set_config(..., true)`): con un pool de conexiones no se filtra
+ * a la petición siguiente. Sin este valor, las políticas no devuelven filas.
+ */
+export async function setTenantContext(tx: Tx, organizationId: string) {
+  await tx.execute(sql`select set_config('app.organization_id', ${organizationId}, true)`);
+}
 
 /**
  * Único punto de acceso a datos de negocio. Recibe la organización UNA vez y
  * cada consulta la aplica; no existe forma de leer o escribir fuera de ella.
+ * Doble barrera: cada consulta filtra por organización Y corre en una transacción
+ * con el contexto de RLS, así que la base tampoco devolvería filas ajenas.
  * Cada cambio deja un registro de auditoría en la misma transacción.
  */
 export function forOrganization(db: Db, organizationId: string, actorId: string | null = null) {
+  const inTenant = <T>(fn: (tx: Tx) => Promise<T>) =>
+    db.transaction(async (tx) => {
+      await setTenantContext(tx, organizationId);
+      return fn(tx);
+    });
+
   const audit = (tx: Tx, action: string, entity: string, entityId: string | null) =>
     tx.insert(auditLogs).values({ organizationId, actorId, action, entity, entityId });
 
-  const ownedAssessment = async (tx: Tx | Db, assessmentId: string) => {
+  const answersOf = async (tx: Tx, assessmentId: string): Promise<Answer[]> => {
+    const rows = await tx
+      .select()
+      .from(controlAnswers)
+      .where(and(eq(controlAnswers.assessmentId, assessmentId), eq(controlAnswers.organizationId, organizationId)));
+    return rows.map((r) => ({
+      controlId: r.controlId,
+      applicable: r.applicable,
+      maturity: r.maturity ?? undefined,
+      justification: r.justification ?? undefined,
+    }));
+  };
+
+  const ownedAssessment = async (tx: Tx, assessmentId: string) => {
     const [row] = await tx
       .select()
       .from(assessments)
@@ -74,7 +104,7 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
       } catch {
         throw new ValidationError(`Marco normativo desconocido: ${frameworkId}`);
       }
-      return db.transaction(async (tx) => {
+      return inTenant(async (tx) => {
         const [a] = await tx
           .insert(assessments)
           .values({ organizationId, frameworkId, targetMaturity })
@@ -86,21 +116,23 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
     },
 
     listAssessments() {
-      return db
-        .select()
-        .from(assessments)
-        .where(eq(assessments.organizationId, organizationId))
-        .orderBy(desc(assessments.createdAt));
+      return inTenant((tx) =>
+        tx
+          .select()
+          .from(assessments)
+          .where(eq(assessments.organizationId, organizationId))
+          .orderBy(desc(assessments.createdAt)),
+      );
     },
 
     getAssessment(assessmentId: string) {
-      return ownedAssessment(db, assessmentId);
+      return inTenant((tx) => ownedAssessment(tx, assessmentId));
     },
 
     async saveAnswers(assessmentId: string, rawAnswers: Answer[]) {
       const answers = rawAnswers.map((a) => AnswerSchema.parse(a));
       const framework = (id: string) => loadFramework(id);
-      return db.transaction(async (tx) => {
+      return inTenant(async (tx) => {
         const assessment = await ownedAssessment(tx, assessmentId);
         if (!assessment) throw new NotFoundError("Evaluación");
         const valid = new Set(framework(assessment.frameworkId).controls.map((c) => c.id));
@@ -128,28 +160,21 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
       });
     },
 
-    async getAnswers(assessmentId: string): Promise<Answer[]> {
-      const rows = await db
-        .select()
-        .from(controlAnswers)
-        .where(and(eq(controlAnswers.assessmentId, assessmentId), eq(controlAnswers.organizationId, organizationId)));
-      return rows.map((r) => ({
-        controlId: r.controlId,
-        applicable: r.applicable,
-        maturity: r.maturity ?? undefined,
-        justification: r.justification ?? undefined,
-      }));
+    getAnswers(assessmentId: string): Promise<Answer[]> {
+      return inTenant((tx) => answersOf(tx, assessmentId));
     },
 
-    async computeResult(assessmentId: string): Promise<AssessmentResult> {
-      const assessment = await ownedAssessment(db, assessmentId);
-      if (!assessment) throw new NotFoundError("Evaluación");
-      const answers = await this.getAnswers(assessmentId);
-      return scoreAssessment(loadFramework(assessment.frameworkId), answers, assessment.targetMaturity);
+    computeResult(assessmentId: string): Promise<AssessmentResult> {
+      return inTenant(async (tx) => {
+        const assessment = await ownedAssessment(tx, assessmentId);
+        if (!assessment) throw new NotFoundError("Evaluación");
+        const answers = await answersOf(tx, assessmentId);
+        return scoreAssessment(loadFramework(assessment.frameworkId), answers, assessment.targetMaturity);
+      });
     },
 
     async addEvidence(assessmentId: string, controlId: string, source: string, description: string) {
-      return db.transaction(async (tx) => {
+      return inTenant(async (tx) => {
         const [answer] = await tx
           .select()
           .from(controlAnswers)
@@ -173,16 +198,18 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
 
     /** Registra un evento de auditoría propio (inicio de sesión, cierre, etc.). */
     async record(action: string, entity: string, entityId: string | null = null) {
-      await db.insert(auditLogs).values({ organizationId, actorId, action, entity, entityId });
+      await inTenant((tx) => audit(tx, action, entity, entityId));
     },
 
     listAuditLog(limit = 50) {
-      return db
-        .select()
-        .from(auditLogs)
-        .where(eq(auditLogs.organizationId, organizationId))
-        .orderBy(desc(auditLogs.createdAt))
-        .limit(limit);
+      return inTenant((tx) =>
+        tx
+          .select()
+          .from(auditLogs)
+          .where(eq(auditLogs.organizationId, organizationId))
+          .orderBy(desc(auditLogs.createdAt))
+          .limit(limit),
+      );
     },
 
     async getOrganization() {
@@ -195,7 +222,7 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
     },
 
     async updateOrganization(changes: { name?: string; requireMfa?: boolean }) {
-      return db.transaction(async (tx) => {
+      return inTenant(async (tx) => {
         const [org] = await tx
           .update(organizations)
           .set(changes)
@@ -224,7 +251,7 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
 
     /** Cambia el rol. Nunca deja a la organización sin ADMIN. */
     async changeMemberRole(userId: string, role: Role) {
-      return db.transaction(async (tx) => {
+      return inTenant(async (tx) => {
         const member = await lockMemberAndAdmins(tx, userId);
         if (member.role === "ADMIN" && role !== "ADMIN") await assertAnotherAdmin(tx, userId);
         await tx
@@ -241,7 +268,7 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
      * borran en cascada (FK a la membresía). Nunca deja a la organización sin ADMIN.
      */
     async removeMember(userId: string) {
-      await db.transaction(async (tx) => {
+      await inTenant(async (tx) => {
         const member = await lockMemberAndAdmins(tx, userId);
         if (member.role === "ADMIN") await assertAnotherAdmin(tx, userId);
         await tx

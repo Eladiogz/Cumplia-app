@@ -80,7 +80,7 @@ beforeAll(async () => {
   await ctx.db.insert(schema.memberships).values({ userId: A.memberId, organizationId: A.orgId, role: "CONSULTANT" });
 
   cookieB = (await register("admin-b@ejemplo.com", "Organización B")).cookie;
-});
+}, 60_000); // tres registros con scrypt + migraciones: lento bajo carga en paralelo
 afterAll(async () => {
   await app.close();
   await ctx.close();
