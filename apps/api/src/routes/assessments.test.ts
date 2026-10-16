@@ -9,10 +9,12 @@ let app: ReturnType<typeof buildApp>;
 let orgA: string;
 let orgB: string;
 
-// Resolver de prueba: la organización viene en el header x-org.
+// Resolver de prueba: la organización viene en el header x-org (actúa como ADMIN).
 const testResolver: TenantResolver = (req) => {
   const id = req.headers["x-org"];
-  return typeof id === "string" ? { organizationId: id, actorId: null } : null;
+  return typeof id === "string"
+    ? { organizationId: id, actorId: null, role: "ADMIN", mfaEnabled: false, mfaSetupRequired: false }
+    : null;
 };
 
 beforeAll(async () => {
@@ -136,7 +138,9 @@ describe("resolver de desarrollo", () => {
   it("solo acepta organizaciones existentes y UUID válidos", async () => {
     const resolver = createDevTenantResolver(ctx.db);
     const req = (h: Record<string, string>) => ({ headers: h }) as never;
-    expect(await resolver(req({ "x-organization-id": orgA }))).toEqual({ organizationId: orgA, actorId: null });
+    expect(await resolver(req({ "x-organization-id": orgA }))).toMatchObject({ organizationId: orgA, actorId: null, role: "ADMIN" });
+    expect(await resolver(req({ "x-organization-id": orgA, "x-role": "AUDITOR" }))).toMatchObject({ role: "AUDITOR" });
+    expect(await resolver(req({ "x-organization-id": orgA, "x-role": "SUPERUSER" }))).toMatchObject({ role: "ADMIN" });
     expect(await resolver(req({ "x-organization-id": "00000000-0000-4000-8000-000000000000" }))).toBeNull();
     expect(await resolver(req({ "x-organization-id": "basura" }))).toBeNull();
     expect(await resolver(req({}))).toBeNull();

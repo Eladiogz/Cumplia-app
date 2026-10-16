@@ -7,8 +7,8 @@ import { listFrameworks, loadFramework } from "@cumplia/frameworks";
 import { AnswerSchema, buildStatementOfApplicability, scoreAssessment } from "@cumplia/core";
 import { ConflictError, NotFoundError, ValidationError, type Db } from "@cumplia/db";
 import { authRoutes } from "./routes/auth.js";
-import { assessmentRoutes } from "./routes/assessments.js";
 import { mfaRoutes } from "./routes/mfa.js";
+import { protectedRoutes } from "./protected.js";
 import type { TenantResolver } from "./tenant.js";
 
 const AssessmentBody = z.object({
@@ -108,7 +108,7 @@ export function buildApp({
     if (mfaEncryptionKey) {
       app.register(mfaRoutes, { db, secureCookies, authRateLimit, encryptionKey: mfaEncryptionKey });
     }
-    app.register(assessmentRoutes, { db, resolveTenant });
+    app.register(protectedRoutes, { db, resolveTenant });
   }
 
   return app;

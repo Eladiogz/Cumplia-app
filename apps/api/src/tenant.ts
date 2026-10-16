@@ -7,7 +7,11 @@ import { SESSION_COOKIE, hashToken } from "./security/session.js";
 export interface Tenant {
   organizationId: string;
   actorId: string | null;
-  role?: Role;
+  role: Role;
+  /** El usuario tiene MFA activo. */
+  mfaEnabled: boolean;
+  /** La organización exige MFA y el usuario todavía no lo activó: solo puede configurarlo. */
+  mfaSetupRequired: boolean;
 }
 
 /** Devuelve el tenant de la petición o null si no está autenticada. */
@@ -20,6 +24,7 @@ declare module "fastify" {
 }
 
 const Uuid = z.string().uuid();
+export const RoleSchema = z.enum(["ADMIN", "CONSULTANT", "AUDITOR"]);
 
 /** Autenticación real: cookie de sesión → usuario, organización y rol vigentes. */
 export function createSessionTenantResolver(db: Db): TenantResolver {
@@ -28,7 +33,13 @@ export function createSessionTenantResolver(db: Db): TenantResolver {
     if (!token) return null;
     const session = await findActiveSession(db, hashToken(token));
     if (!session) return null;
-    return { organizationId: session.organizationId, actorId: session.userId, role: session.role };
+    return {
+      organizationId: session.organizationId,
+      actorId: session.userId,
+      role: session.role,
+      mfaEnabled: session.userMfaEnabled,
+      mfaSetupRequired: session.organizationRequiresMfa && !session.userMfaEnabled,
+    };
   };
 }
 
@@ -46,12 +57,20 @@ export function firstOf(...resolvers: TenantResolver[]): TenantResolver {
 /**
  * SOLO DESARROLLO. Toma la organización del header `x-organization-id`.
  * Cualquiera podría falsificarlo: server.ts no lo activa en producción.
+ * Actúa como ADMIN salvo que `x-role` indique otro rol.
  */
 export function createDevTenantResolver(db: Db): TenantResolver {
   return async (req) => {
     const org = Uuid.safeParse(req.headers["x-organization-id"]);
     if (!org.success || !(await organizationExists(db, org.data))) return null;
     const actor = Uuid.safeParse(req.headers["x-actor-id"]);
-    return { organizationId: org.data, actorId: actor.success ? actor.data : null };
+    const role = RoleSchema.safeParse(req.headers["x-role"]);
+    return {
+      organizationId: org.data,
+      actorId: actor.success ? actor.data : null,
+      role: role.success ? role.data : "ADMIN",
+      mfaEnabled: false,
+      mfaSetupRequired: false,
+    };
   };
 }

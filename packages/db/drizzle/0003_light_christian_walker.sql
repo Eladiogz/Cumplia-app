@@ -1,0 +1,1 @@
+ALTER TABLE "organizations" ADD COLUMN "require_mfa" boolean DEFAULT false NOT NULL;

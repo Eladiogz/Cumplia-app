@@ -34,16 +34,27 @@ Rutas públicas (sin estado):
 | GET | `/frameworks` · `/frameworks/:id` | Marcos disponibles y sus controles |
 | POST | `/frameworks/:id/assessment` | Calcula puntaje, brechas y SoA sin guardar nada |
 
-Rutas por organización (requieren tenant; sin él responden 401):
+Rutas por organización (requieren sesión; sin ella responden 401, sin el rol necesario 403):
 
-| Método | Ruta | Descripción |
-|---|---|---|
-| POST · GET | `/assessments` | Crear y listar evaluaciones |
-| GET | `/assessments/:id` | Detalle |
-| GET · PUT | `/assessments/:id/answers` | Leer y guardar respuestas |
-| GET | `/assessments/:id/result` · `/soa` | Puntaje y Declaración de Aplicabilidad |
-| POST | `/assessments/:id/evidence` | Registrar evidencia de un control |
-| GET | `/audit-log` | Registro de auditoría |
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| GET | `/assessments` · `/assessments/:id` | Listar y ver evaluaciones | todos |
+| POST | `/assessments` | Crear evaluación | ADMIN, CONSULTANT |
+| GET · PUT | `/assessments/:id/answers` | Leer (todos) y guardar (ADMIN, CONSULTANT) respuestas | — |
+| GET | `/assessments/:id/result` · `/soa` | Puntaje y Declaración de Aplicabilidad | todos |
+| POST | `/assessments/:id/evidence` | Registrar evidencia de un control | ADMIN, CONSULTANT |
+| GET | `/audit-log` | Registro de auditoría | ADMIN, AUDITOR |
+| GET | `/organization` | Datos y políticas de la organización | todos |
+| PATCH | `/organization` | Cambiar nombre o exigir MFA (`requireMfa`) | ADMIN |
+| GET | `/members` | Miembros, rol y si tienen MFA (revisión de accesos) | ADMIN, AUDITOR |
+| PATCH · DELETE | `/members/:userId` | Cambiar rol o quitar de la organización | ADMIN |
+
+### Roles
+- **ADMIN**: todo. **CONSULTANT**: trabaja las evaluaciones; no ve auditoría ni administra. **AUDITOR**: solo lectura, incluida auditoría y miembros.
+- La matriz vive en `apps/api/src/security/permissions.ts`; lo que no figura se deniega. Cada ruta protegida declara su permiso y, si alguna no lo hace, la API no arranca.
+- El rol se lee en cada petición: un cambio o una baja rigen al instante, sin esperar a que venza la sesión.
+- Una organización nunca puede quedar sin ADMIN.
+- Con `requireMfa` activo, quien no tenga MFA solo puede iniciar sesión y configurarlo (el resto responde 403 `MFA_SETUP_REQUIRED`; `/auth/me` devuelve `mfaSetupRequired`). Para activarlo, el ADMIN tiene que tener MFA.
 
 ### Autenticación
 Sesiones en el servidor con cookie `httpOnly` + `SameSite=Lax` (y `Secure` en producción). En la base solo se guarda el hash del token, así que se pueden revocar al instante.
@@ -94,7 +105,7 @@ curl -b cookies.txt -X POST localhost:3000/assessments -H "content-type: applica
   -d '{"frameworkId":"iso27001-2022"}'
 curl -b cookies.txt localhost:3000/auth/me
 ```
-El header `x-organization-id` (solo desarrollo) sigue disponible con `ALLOW_DEV_TENANT_HEADER=true`; nunca funciona con `NODE_ENV=production`.
+El header `x-organization-id` (solo desarrollo) sigue disponible con `ALLOW_DEV_TENANT_HEADER=true`; actúa como ADMIN salvo que se indique otro rol con `x-role`. Nunca funciona con `NODE_ENV=production`.
 
 ## Flujo de trabajo Git
 - `main` protegida: solo entra por Pull Request con CI en verde.
