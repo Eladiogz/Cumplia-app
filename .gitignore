@@ -7,3 +7,5 @@ coverage/
 *.log
 .DS_Store
 .vscode/
+# Cookies de pruebas con curl (-c cookies.txt): contienen tokens de sesión
+cookies*.txt
