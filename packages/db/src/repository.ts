@@ -18,6 +18,13 @@ export class ValidationError extends Error {
   }
 }
 
+export class ConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConflictError";
+  }
+}
+
 export async function organizationExists(db: Db, organizationId: string) {
   const [row] = await db
     .select({ id: organizations.id })
@@ -153,6 +160,11 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
         await audit(tx, "evidence.add", "evidence", ev.id);
         return ev;
       });
+    },
+
+    /** Registra un evento de auditoría propio (inicio de sesión, cierre, etc.). */
+    async record(action: string, entity: string, entityId: string | null = null) {
+      await db.insert(auditLogs).values({ organizationId, actorId, action, entity, entityId });
     },
 
     listAuditLog(limit = 50) {

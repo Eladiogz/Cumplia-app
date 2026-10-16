@@ -1,10 +1,12 @@
 import Fastify from "fastify";
+import cookie from "@fastify/cookie";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import { ZodError, z } from "zod";
 import { listFrameworks, loadFramework } from "@cumplia/frameworks";
 import { AnswerSchema, buildStatementOfApplicability, scoreAssessment } from "@cumplia/core";
-import { NotFoundError, ValidationError, type Db } from "@cumplia/db";
+import { ConflictError, NotFoundError, ValidationError, type Db } from "@cumplia/db";
+import { authRoutes } from "./routes/auth.js";
 import { assessmentRoutes } from "./routes/assessments.js";
 import type { TenantResolver } from "./tenant.js";
 
@@ -17,19 +19,36 @@ export interface AppOptions {
   /** Si se omite, solo quedan las rutas sin estado (marcos y cálculo). */
   db?: Db;
   resolveTenant?: TenantResolver;
+  /** Cookies con atributo Secure (obligatorio en producción, sobre HTTPS). */
+  secureCookies?: boolean;
+  /** Orígenes del frontend autorizados a hacer peticiones que modifican datos. */
+  allowedOrigins?: string[];
+  /** Peticiones por minuto y por IP a /auth/register y /auth/login. */
+  authRateLimit?: number;
 }
 
-export function buildApp({ db, resolveTenant = () => null }: AppOptions = {}) {
+export function buildApp({ db, resolveTenant = () => null, secureCookies = false, allowedOrigins = [], authRateLimit = 10 }: AppOptions = {}) {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
 
   app.register(helmet);
+  app.register(cookie);
   app.register(rateLimit, { max: 100, timeWindow: "1 minute" });
+
+  // Defensa CSRF adicional a SameSite: un navegador siempre envía Origin en peticiones
+  // que modifican datos entre sitios; si no es uno de los nuestros, se rechaza.
+  app.addHook("onRequest", async (req, reply) => {
+    const origin = req.headers.origin;
+    if (origin && !["GET", "HEAD", "OPTIONS"].includes(req.method) && !allowedOrigins.includes(origin)) {
+      return reply.code(403).send({ error: "Origen no permitido" });
+    }
+  });
 
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof ZodError) {
       return reply.code(400).send({ error: "Solicitud inválida", details: err.flatten() });
     }
     if (err instanceof ValidationError) return reply.code(400).send({ error: err.message });
+    if (err instanceof ConflictError) return reply.code(409).send({ error: err.message });
     if (err instanceof NotFoundError) return reply.code(404).send({ error: err.message });
     const e = err as Error & { statusCode?: number };
     if (e.statusCode && e.statusCode < 500) return reply.code(e.statusCode).send({ error: e.message });
@@ -71,7 +90,10 @@ export function buildApp({ db, resolveTenant = () => null }: AppOptions = {}) {
     }
   });
 
-  if (db) app.register(assessmentRoutes, { db, resolveTenant });
+  if (db) {
+    app.register(authRoutes, { db, secureCookies, authRateLimit });
+    app.register(assessmentRoutes, { db, resolveTenant });
+  }
 
   return app;
 }
