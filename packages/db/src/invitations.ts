@@ -66,6 +66,7 @@ async function redeem(tx: Tx, tokenHash: string, userId: string) {
     action: "invitation.accept",
     entity: "invitation",
     entityId: inv.id,
+    details: { email: inv.email, role: inv.role },
   });
   return inv;
 }

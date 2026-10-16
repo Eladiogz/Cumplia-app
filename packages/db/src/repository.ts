@@ -12,6 +12,7 @@ import {
   memberships,
   organizations,
   users,
+  type AuditDetails,
 } from "./schema.js";
 
 export class NotFoundError extends Error {
@@ -86,8 +87,8 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
       return fn(tx);
     });
 
-  const audit = (tx: Tx, action: string, entity: string, entityId: string | null) =>
-    tx.insert(auditLogs).values({ organizationId, actorId, action, entity, entityId });
+  const audit = (tx: Tx, action: string, entity: string, entityId: string | null, details?: AuditDetails) =>
+    tx.insert(auditLogs).values({ organizationId, actorId, action, entity, entityId, details: details ?? null });
 
   const answersOf = async (tx: Tx, assessmentId: string): Promise<Answer[]> => {
     const rows = await tx
@@ -210,8 +211,8 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
     },
 
     /** Registra un evento de auditoría propio (inicio de sesión, cierre, etc.). */
-    async record(action: string, entity: string, entityId: string | null = null) {
-      await inTenant((tx) => audit(tx, action, entity, entityId));
+    async record(action: string, entity: string, entityId: string | null = null, details?: AuditDetails) {
+      await inTenant((tx) => audit(tx, action, entity, entityId, details));
     },
 
     listAuditLog(limit = 50) {
@@ -242,7 +243,10 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
           .where(eq(organizations.id, organizationId))
           .returning({ id: organizations.id, name: organizations.name, requireMfa: organizations.requireMfa });
         if (!org) throw new NotFoundError("Organización");
-        await audit(tx, "organization.update", "organization", organizationId);
+        await audit(tx, "organization.update", "organization", organizationId, {
+          ...(changes.name !== undefined ? { name: changes.name } : {}),
+          ...(changes.requireMfa !== undefined ? { requireMfa: changes.requireMfa } : {}),
+        });
         return org;
       });
     },
@@ -271,7 +275,7 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
           .update(memberships)
           .set({ role })
           .where(and(eq(memberships.userId, userId), eq(memberships.organizationId, organizationId)));
-        await audit(tx, "member.role_change", "user", userId);
+        await audit(tx, "member.role_change", "user", userId, { from: member.role, to: role });
         return { userId, role };
       });
     },
@@ -287,7 +291,7 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
         await tx
           .delete(memberships)
           .where(and(eq(memberships.userId, userId), eq(memberships.organizationId, organizationId)));
-        await audit(tx, "member.remove", "user", userId);
+        await audit(tx, "member.remove", "user", userId, { role: member.role });
       });
     },
 
@@ -313,7 +317,7 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
           .values({ organizationId, invitedBy: actorId, ...input })
           .returning(invitationPublicColumns);
         if (!inv) throw new Error("No se pudo crear la invitación");
-        await audit(tx, "invitation.create", "invitation", inv.id);
+        await audit(tx, "invitation.create", "invitation", inv.id, { email: inv.email, role: inv.role });
         return inv;
       });
     },
@@ -335,9 +339,10 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
           .update(invitations)
           .set({ revokedAt: sql`now()` })
           .where(and(eq(invitations.id, invitationId), eq(invitations.organizationId, organizationId), pending))
-          .returning({ id: invitations.id });
-        if (rows.length === 0) throw new NotFoundError("Invitación");
-        await audit(tx, "invitation.revoke", "invitation", invitationId);
+          .returning({ email: invitations.email, role: invitations.role });
+        const [revoked] = rows;
+        if (!revoked) throw new NotFoundError("Invitación");
+        await audit(tx, "invitation.revoke", "invitation", invitationId, { email: revoked.email, role: revoked.role });
       });
     },
   };

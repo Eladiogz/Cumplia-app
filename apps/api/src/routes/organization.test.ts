@@ -121,6 +121,8 @@ describe("roles aplicados en las rutas", () => {
 
     const changed = await call("PATCH", `/members/${member.userId}`, admin.cookie, { role: "AUDITOR" });
     expect(changed.json()).toEqual({ userId: member.userId, role: "AUDITOR" });
+    const log = (await call("GET", "/audit-log", admin.cookie)).json() as { action: string; details: unknown }[];
+    expect(log.find((l) => l.action === "member.role_change")?.details).toEqual({ from: "CONSULTANT", to: "AUDITOR" });
     expect((await call("POST", "/assessments", member.cookie, { frameworkId: "iso27001-2022" })).statusCode).toBe(403);
     expect((await call("GET", "/auth/me", member.cookie)).json().role).toBe("AUDITOR");
   });

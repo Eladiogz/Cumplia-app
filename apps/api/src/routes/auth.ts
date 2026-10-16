@@ -102,7 +102,9 @@ export async function authRoutes(app: FastifyInstance, { db, secureCookies, auth
       if (user && !locked) await registerFailedLogin(db, user.id, MAX_ATTEMPTS, LOCK_MINUTES);
       const membership = user ? await getPrimaryMembership(db, user.id) : null;
       if (user && membership) {
-        await forOrganization(db, membership.organizationId, user.id).record("auth.login_failed", "user", user.id);
+        await forOrganization(db, membership.organizationId, user.id).record("auth.login_failed", "user", user.id, {
+          reason: locked ? "account_locked" : "invalid_credentials",
+        });
       }
       return reply.code(401).send({ error: INVALID });
     }

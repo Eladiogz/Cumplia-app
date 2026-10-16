@@ -5,6 +5,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -19,6 +20,8 @@ import {
  * Además, las relaciones padre-hijo usan FK compuestas (id, organization_id):
  * la base rechaza cualquier fila que mezcle datos de dos organizaciones.
  */
+export type AuditDetails = Record<string, string | number | boolean | null>;
+
 export const roleEnum = pgEnum("role", ["ADMIN", "CONSULTANT", "AUDITOR"]);
 
 export const organizations = pgTable("organizations", {
@@ -209,6 +212,8 @@ export const auditLogs = pgTable(
     action: text("action").notNull(),
     entity: text("entity").notNull(),
     entityId: text("entity_id"),
+    // Contexto del evento (p. ej. rol anterior y nuevo). Nunca secretos ni tokens.
+    details: jsonb("details").$type<AuditDetails>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("audit_logs_org_created_idx").on(t.organizationId, t.createdAt)],

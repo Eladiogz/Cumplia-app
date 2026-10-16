@@ -133,7 +133,10 @@ export async function mfaRoutes(app: FastifyInstance, { db, secureCookies, authR
     if (!method) {
       if (!isLocked(user)) await registerFailedLogin(db, user.id, MAX_ATTEMPTS, LOCK_MINUTES);
       await registerFailedMfaChallenge(db, challenge.id, MAX_ATTEMPTS);
-      await audit.record("auth.mfa_failed", "user", user.id);
+      await audit.record("auth.mfa_failed", "user", user.id, {
+        reason: isLocked(user) ? "account_locked" : "invalid_code",
+        method: body.code !== undefined ? "totp" : "recovery_code",
+      });
       return reply.code(401).send({ error: INVALID });
     }
 
