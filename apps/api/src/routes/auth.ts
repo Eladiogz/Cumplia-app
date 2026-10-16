@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyBaseLogger, FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import {
   ConflictError,
@@ -8,12 +8,14 @@ import {
   findActiveSession,
   findUserByEmail,
   forOrganization,
-  getPrimaryMembership,
+  getLoginMembership,
   getUserById,
   registerFailedLogin,
   registerUserWithOrganization,
   type Db,
 } from "@cumplia/db";
+import { notify, type Mailer } from "../email/mailer.js";
+import { accountLockedEmail } from "../email/templates.js";
 import { dummyHash, hashPassword, verifyPassword } from "../security/password.js";
 import {
   MFA_CHALLENGE_COOKIE,
@@ -49,9 +51,24 @@ interface Options {
   secureCookies: boolean;
   /** Máximo de peticiones por minuto y por IP a registro e inicio de sesión. */
   authRateLimit: number;
+  mailer: Mailer;
 }
 
-export async function authRoutes(app: FastifyInstance, { db, secureCookies, authRateLimit }: Options) {
+/**
+ * Registra un intento fallido y, si con él se bloqueó la cuenta, avisa por email
+ * (en segundo plano: la respuesta tarda lo mismo, no revela que la cuenta existe).
+ */
+export async function failedAttempt(
+  db: Db,
+  { mailer, log }: { mailer: Mailer; log: FastifyBaseLogger },
+  user: { id: string; email: string },
+) {
+  if (await registerFailedLogin(db, user.id, MAX_ATTEMPTS, LOCK_MINUTES)) {
+    notify(mailer, log, accountLockedEmail(user.email, LOCK_MINUTES));
+  }
+}
+
+export async function authRoutes(app: FastifyInstance, { db, secureCookies, authRateLimit, mailer }: Options) {
   // Límite propio y más estricto que el global para frenar fuerza bruta.
   const strict = { config: { rateLimit: { max: authRateLimit, timeWindow: "1 minute" } } };
 
@@ -99,15 +116,17 @@ export async function authRoutes(app: FastifyInstance, { db, secureCookies, auth
     const locked = user?.lockedUntil ? user.lockedUntil.getTime() > Date.now() : false;
 
     if (!user || !user.passwordHash || !passwordOk || locked) {
-      if (user && !locked) await registerFailedLogin(db, user.id, MAX_ATTEMPTS, LOCK_MINUTES);
-      const membership = user ? await getPrimaryMembership(db, user.id) : null;
+      if (user && !locked) await failedAttempt(db, { mailer, log: req.log }, user);
+      const membership = user ? await getLoginMembership(db, user.id) : null;
       if (user && membership) {
-        await forOrganization(db, membership.organizationId, user.id).record("auth.login_failed", "user", user.id);
+        await forOrganization(db, membership.organizationId, user.id).record("auth.login_failed", "user", user.id, {
+          reason: locked ? "account_locked" : "invalid_credentials",
+        });
       }
       return reply.code(401).send({ error: INVALID });
     }
 
-    const membership = await getPrimaryMembership(db, user.id);
+    const membership = await getLoginMembership(db, user.id);
     if (!membership) return reply.code(401).send({ error: INVALID });
 
     // Con MFA activo la contraseña sola no alcanza. El contador de fallos no se

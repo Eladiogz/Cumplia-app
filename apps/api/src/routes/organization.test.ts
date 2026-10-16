@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { createSession, schema, type Role } from "@cumplia/db";
 import { createTestDb } from "@cumplia/db/testing";
 import { buildApp } from "../app.js";
+import { MemoryMailer } from "../email/mailer.js";
 import { can } from "../security/permissions.js";
 import { SESSION_COOKIE, hashToken, newSessionToken, sessionExpiry } from "../security/session.js";
 import { base32Decode, totp } from "../security/totp.js";
@@ -121,6 +122,8 @@ describe("roles aplicados en las rutas", () => {
 
     const changed = await call("PATCH", `/members/${member.userId}`, admin.cookie, { role: "AUDITOR" });
     expect(changed.json()).toEqual({ userId: member.userId, role: "AUDITOR" });
+    const log = (await call("GET", "/audit-log", admin.cookie)).json() as { action: string; details: unknown }[];
+    expect(log.find((l) => l.action === "member.role_change")?.details).toEqual({ from: "CONSULTANT", to: "AUDITOR" });
     expect((await call("POST", "/assessments", member.cookie, { frameworkId: "iso27001-2022" })).statusCode).toBe(403);
     expect((await call("GET", "/auth/me", member.cookie)).json().role).toBe("AUDITOR");
   });
@@ -225,7 +228,7 @@ describe("rutas protegidas", () => {
     const Fastify = (await import("fastify")).default;
     const bad = Fastify();
     bad.register(async (scope) => {
-      await protectedRoutes(scope, { db: ctx.db, resolveTenant: () => null });
+      await protectedRoutes(scope, { db: ctx.db, resolveTenant: () => null, mailer: new MemoryMailer(), appUrl: "http://x" });
       scope.get("/sin-permiso", async () => "ups");
     });
     await expect(bad.ready()).rejects.toThrow(/sin permiso declarado/);

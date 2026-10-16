@@ -5,6 +5,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -19,6 +20,8 @@ import {
  * Además, las relaciones padre-hijo usan FK compuestas (id, organization_id):
  * la base rechaza cualquier fila que mezcle datos de dos organizaciones.
  */
+export type AuditDetails = Record<string, string | number | boolean | null>;
+
 export const roleEnum = pgEnum("role", ["ADMIN", "CONSULTANT", "AUDITOR"]);
 
 export const organizations = pgTable("organizations", {
@@ -43,6 +46,8 @@ export const users = pgTable("users", {
   mfaEnabledAt: timestamp("mfa_enabled_at", { withTimezone: true }),
   // Último paso de tiempo TOTP aceptado: impide reutilizar un código ya usado.
   mfaLastUsedStep: integer("mfa_last_used_step"),
+  // Organización de la última sesión: el próximo login vuelve a ella si sigue siendo miembro.
+  lastOrganizationId: uuid("last_organization_id").references(() => organizations.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -209,6 +214,8 @@ export const auditLogs = pgTable(
     action: text("action").notNull(),
     entity: text("entity").notNull(),
     entityId: text("entity_id"),
+    // Contexto del evento (p. ej. rol anterior y nuevo). Nunca secretos ni tokens.
+    details: jsonb("details").$type<AuditDetails>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("audit_logs_org_created_idx").on(t.organizationId, t.createdAt)],

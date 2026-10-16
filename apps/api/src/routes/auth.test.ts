@@ -197,9 +197,10 @@ describe("inicio de sesión", () => {
     const { email, cookie } = await register();
     await post("/auth/login", { email, password: "incorrecta-123456" });
     const ok = await post("/auth/login", { email, password: PASSWORD });
-    const log = (await get("/audit-log", cookieOf(ok))).json() as { action: string }[];
+    const log = (await get("/audit-log", cookieOf(ok))).json() as { action: string; details: unknown }[];
     const actions = log.map((l) => l.action);
     expect(actions).toEqual(expect.arrayContaining(["user.register", "auth.login_failed", "auth.login"]));
+    expect(log.find((l) => l.action === "auth.login_failed")?.details).toEqual({ reason: "invalid_credentials" });
     expect(cookie).toBeTruthy();
   });
 });

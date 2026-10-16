@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, lt, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, lt, ne, sql } from "drizzle-orm";
 import type { Db } from "./client.js";
 import { ConflictError, setTenantContext } from "./repository.js";
 import { auditLogs, memberships, organizations, sessions, users } from "./schema.js";
@@ -46,24 +46,32 @@ export async function getUserById(db: Db, id: string) {
   return user ?? null;
 }
 
-/** Suma un intento fallido y bloquea la cuenta al llegar al máximo. */
+/**
+ * Suma un intento fallido y bloquea la cuenta al llegar al máximo. Se llama solo
+ * con la cuenta desbloqueada, así que `true` significa "se bloqueó con este intento".
+ */
 export async function registerFailedLogin(db: Db, userId: string, maxAttempts: number, lockMinutes: number) {
-  await db
+  const [row] = await db
     .update(users)
     .set({
       failedLoginAttempts: sql`${users.failedLoginAttempts} + 1`,
       lockedUntil: sql`case when ${users.failedLoginAttempts} + 1 >= ${maxAttempts}
         then now() + make_interval(mins => ${lockMinutes}) else ${users.lockedUntil} end`,
     })
-    .where(eq(users.id, userId));
+    .where(eq(users.id, userId))
+    .returning({ attempts: users.failedLoginAttempts });
+  return (row?.attempts ?? 0) >= maxAttempts;
 }
 
 export async function clearLoginFailures(db: Db, userId: string) {
   await db.update(users).set({ failedLoginAttempts: 0, lockedUntil: null }).where(eq(users.id, userId));
 }
 
-/** Organización por defecto del usuario: la primera a la que se unió. */
-export async function getPrimaryMembership(db: Db, userId: string) {
+/**
+ * Organización con la que inicia sesión el usuario: la de su última sesión si
+ * sigue siendo miembro; si no, la primera a la que se unió.
+ */
+export async function getLoginMembership(db: Db, userId: string) {
   const [row] = await db
     .select({
       organizationId: memberships.organizationId,
@@ -72,19 +80,27 @@ export async function getPrimaryMembership(db: Db, userId: string) {
     })
     .from(memberships)
     .innerJoin(organizations, eq(organizations.id, memberships.organizationId))
+    .innerJoin(users, eq(users.id, memberships.userId))
     .where(eq(memberships.userId, userId))
-    .orderBy(asc(organizations.createdAt))
+    .orderBy(
+      desc(sql`${memberships.organizationId} is not distinct from ${users.lastOrganizationId}`),
+      asc(organizations.createdAt),
+    )
     .limit(1);
   return row ?? null;
 }
 
+/** Crea la sesión y recuerda su organización para el próximo inicio de sesión. */
 export async function createSession(
   db: Db,
   input: { userId: string; organizationId: string; tokenHash: string; expiresAt: Date },
 ) {
-  const [row] = await db.insert(sessions).values(input).returning();
-  if (!row) throw new Error("No se pudo crear la sesión");
-  return row;
+  return db.transaction(async (tx) => {
+    const [row] = await tx.insert(sessions).values(input).returning();
+    if (!row) throw new Error("No se pudo crear la sesión");
+    await tx.update(users).set({ lastOrganizationId: input.organizationId }).where(eq(users.id, input.userId));
+    return row;
+  });
 }
 
 /**

@@ -11,5 +11,14 @@ services:
       - db_data:/var/lib/postgresql/data
       # Crea el usuario sin privilegios de la API (solo con un volumen nuevo).
       - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+
+  # Solo desarrollo: atrapa todos los emails (no salen a internet).
+  # Bandeja en http://localhost:8025 · SMTP en localhost:1025
+  mail:
+    image: axllent/mailpit:v1.31.3
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
 volumes:
   db_data:

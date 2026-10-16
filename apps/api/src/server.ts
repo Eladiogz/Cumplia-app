@@ -1,5 +1,6 @@
 import { createDb, rowLevelSecurityBypassReasons } from "@cumplia/db";
 import { buildApp } from "./app.js";
+import { createSmtpMailer } from "./email/mailer.js";
 import { parseEncryptionKey } from "./security/encryption.js";
 import { createDevTenantResolver, createSessionTenantResolver, firstOf } from "./tenant.js";
 
@@ -22,16 +23,26 @@ if (rlsBypass.length > 0) {
   console.warn(`ADVERTENCIA: ${msg}`);
 }
 
+// Emails: en producción es obligatorio un SMTP real (las invitaciones dependen de él).
+// En desarrollo, Mailpit (docker compose) o, si no hay SMTP_URL, el log de la API.
+const smtpUrl = process.env.SMTP_URL;
+if (isProd && !smtpUrl) throw new Error("Falta SMTP_URL: en producción los emails deben enviarse de verdad");
+const mailer = smtpUrl ? createSmtpMailer(smtpUrl, process.env.MAIL_FROM ?? "Cumplia <no-reply@cumplia.local>") : undefined;
+if (!mailer) console.warn("ADVERTENCIA: sin SMTP_URL, los emails (con sus links) se escriben en el log.");
+
 // El resolver de desarrollo jamás se activa en producción.
 const devTenant = process.env.ALLOW_DEV_TENANT_HEADER === "true" && !isProd;
 const session = createSessionTenantResolver(db);
+const allowedOrigins = (process.env.APP_ORIGIN ?? "http://localhost:3001").split(",").map((o) => o.trim());
 
 const app = buildApp({
   db,
   resolveTenant: devTenant ? firstOf(session, createDevTenantResolver(db)) : session,
   secureCookies: isProd,
   mfaEncryptionKey,
-  allowedOrigins: (process.env.APP_ORIGIN ?? "http://localhost:3001").split(",").map((o) => o.trim()),
+  allowedOrigins,
+  mailer,
+  appUrl: process.env.APP_URL ?? allowedOrigins[0],
 });
 app.addHook("onClose", async () => {
   await pool.end();
