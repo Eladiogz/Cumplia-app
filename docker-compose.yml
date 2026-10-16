@@ -9,5 +9,7 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+      # Crea el usuario sin privilegios de la API (solo con un volumen nuevo).
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
 volumes:
   db_data:

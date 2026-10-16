@@ -2,7 +2,7 @@
 
 **Cumplimiento sin planillas.** Plataforma GRC para pymes y consultores de LATAM: evaluá tu madurez frente a ISO 27001, generá la Declaración de Aplicabilidad y seguí las brechas, todo en español.
 
-## Estado: Fase 1 completa · Fase 2A (persistencia)
+## Estado: Fases 1 y 2A completas · Fase 2B (accesos) en curso
 - Monorepo TypeScript (pnpm): `apps/api`, `packages/frameworks`, `packages/core`
 - Los 93 controles del Anexo A de ISO/IEC 27001:2022 como datos versionados
 - Motor de puntaje de madurez (escala 0-4), brechas priorizadas y Declaración de Aplicabilidad (SoA)
@@ -14,8 +14,11 @@
 ### Multi-tenant: cómo se aíslan las organizaciones
 1. **Código**: todo acceso a datos de negocio pasa por `forOrganization(db, orgId)`; un recurso ajeno responde 404 (no revela que existe).
 2. **Base de datos**: FK compuestas `(id, organization_id)` entre evaluaciones, respuestas y evidencia; sesiones y desafíos MFA atados a la membresía `(user_id, organization_id)`. La base rechaza cualquier fila que mezcle organizaciones.
-3. **Auditoría inalterable**: un trigger impide `UPDATE`, `DELETE` y `TRUNCATE` sobre `audit_logs`.
-4. **Tests que se mantienen solos**: `tenant-isolation.test.ts` descubre todas las rutas protegidas y verifica que una organización no pueda leer ni modificar datos de otra. Una ruta nueva queda cubierta automáticamente.
+3. **Row-Level Security**: en `assessments`, `control_answers`, `evidence` y `audit_logs`, Postgres solo devuelve y deja escribir filas de la organización fijada en la transacción (`forOrganization` lo hace siempre). Sin organización activa: ninguna fila. La API se conecta con un usuario del rol `cumplia_app`, sin privilegios de dueño; **en producción se niega a arrancar** si la conexión se saltearía RLS (superusuario, `BYPASSRLS` o dueño).
+4. **Auditoría inalterable**: un trigger impide `UPDATE`, `DELETE` y `TRUNCATE` sobre `audit_logs`, y el rol de la API ni siquiera tiene esos permisos.
+5. **Tests que se mantienen solos**: `tenant-isolation.test.ts` descubre todas las rutas protegidas y verifica que una organización no pueda leer ni modificar datos de otra; otro test exige RLS en toda tabla nueva con `organization_id`. Todos los tests corren con el mismo rol que la API.
+
+Las tablas de identidad (`users`, `sessions`, `mfa_challenges`, `memberships`) no tienen RLS: se consultan antes de saber la organización (login, cookie). Su aislamiento lo dan las FK a la membresía y el código.
 
 ## Empezar
 ```bash
@@ -23,13 +26,21 @@ corepack enable
 pnpm install
 pnpm build
 pnpm test
-pnpm dev:api        # http://localhost:3000/health
-docker compose up -d db   # PostgreSQL local
+docker compose up -d db   # PostgreSQL local (crea el usuario cumplia_api)
 cp .env.example .env
-export DATABASE_URL=postgresql://cumplia:cumplia@localhost:5432/cumplia
-pnpm --filter @cumplia/db db:migrate   # aplica las migraciones
+echo "MFA_ENCRYPTION_KEY=$(openssl rand -base64 32)" >> .env
+set -a && . ./.env && set +a
+pnpm --filter @cumplia/db db:migrate   # con MIGRATION_DATABASE_URL (dueño)
+pnpm dev:api        # http://localhost:3000/health, con DATABASE_URL (cumplia_api)
 # tras cambiar src/schema.ts: pnpm --filter @cumplia/db db:generate
 ```
+
+**Si ya tenías el volumen de Postgres creado** (el script de inicio solo corre con un volumen nuevo), creá el usuario de la API una vez:
+```bash
+docker compose exec db psql -U cumplia -d cumplia -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='cumplia_app') THEN CREATE ROLE cumplia_app NOLOGIN; END IF; END \$\$;" -c "CREATE ROLE cumplia_api LOGIN PASSWORD 'cumplia_api' IN ROLE cumplia_app;"
+```
+
+**En producción**: creá el rol `cumplia_app` antes de migrar si el usuario de migraciones no tiene `CREATEROLE`, y un usuario de login para la API con `GRANT cumplia_app TO <usuario>`. Las migraciones que modifiquen datos de tablas con RLS deben fijar `app.organization_id` o correr como superusuario.
 
 ## API
 Rutas públicas (sin estado):
@@ -95,15 +106,7 @@ TOTP compatible con Google Authenticator, Microsoft Authenticator, 1Password, et
 - Auditoría: `mfa.enabled`, `mfa.disabled`, `mfa.disable_failed`, `auth.mfa_failed`, `mfa.recovery_code_used`.
 
 ### Probar en local
-```bash
-docker compose up -d db
-cp .env.example .env
-echo "MFA_ENCRYPTION_KEY=$(openssl rand -base64 32)" >> .env   # solo la primera vez
-set -a && . ./.env && set +a
-pnpm --filter @cumplia/db db:migrate
-pnpm dev:api          # en una terminal; dejala abierta
-```
-En **otra** terminal:
+Con la base y el `.env` preparados como en [Empezar](#empezar), dejá `pnpm dev:api` corriendo en una terminal. En **otra** terminal:
 ```bash
 curl -i -c cookies.txt -X POST localhost:3000/auth/register -H "content-type: application/json" \
   -d '{"email":"yo@ejemplo.com","password":"una-clave-larga-123","organizationName":"Mi empresa"}'

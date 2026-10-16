@@ -1,6 +1,6 @@
 import { and, asc, eq, gt, lt, ne, sql } from "drizzle-orm";
 import type { Db } from "./client.js";
-import { ConflictError } from "./repository.js";
+import { ConflictError, setTenantContext } from "./repository.js";
 import { auditLogs, memberships, organizations, sessions, users } from "./schema.js";
 
 export type Role = "ADMIN" | "CONSULTANT" | "AUDITOR";
@@ -24,6 +24,7 @@ export async function registerUserWithOrganization(
         .returning();
       if (!org || !user) throw new Error("No se pudo crear el usuario");
       await tx.insert(memberships).values({ userId: user.id, organizationId: org.id, role: "ADMIN" });
+      await setTenantContext(tx, org.id); // la auditoría está protegida por RLS
       await tx
         .insert(auditLogs)
         .values({ organizationId: org.id, actorId: user.id, action: "user.register", entity: "user", entityId: user.id });
