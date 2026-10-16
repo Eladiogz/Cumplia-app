@@ -8,7 +8,7 @@ import {
   findActiveSession,
   findUserByEmail,
   forOrganization,
-  getPrimaryMembership,
+  getLoginMembership,
   getUserById,
   registerFailedLogin,
   registerUserWithOrganization,
@@ -100,7 +100,7 @@ export async function authRoutes(app: FastifyInstance, { db, secureCookies, auth
 
     if (!user || !user.passwordHash || !passwordOk || locked) {
       if (user && !locked) await registerFailedLogin(db, user.id, MAX_ATTEMPTS, LOCK_MINUTES);
-      const membership = user ? await getPrimaryMembership(db, user.id) : null;
+      const membership = user ? await getLoginMembership(db, user.id) : null;
       if (user && membership) {
         await forOrganization(db, membership.organizationId, user.id).record("auth.login_failed", "user", user.id, {
           reason: locked ? "account_locked" : "invalid_credentials",
@@ -109,7 +109,7 @@ export async function authRoutes(app: FastifyInstance, { db, secureCookies, auth
       return reply.code(401).send({ error: INVALID });
     }
 
-    const membership = await getPrimaryMembership(db, user.id);
+    const membership = await getLoginMembership(db, user.id);
     if (!membership) return reply.code(401).send({ error: INVALID });
 
     // Con MFA activo la contraseña sola no alcanza. El contador de fallos no se

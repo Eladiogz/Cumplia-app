@@ -46,6 +46,8 @@ export const users = pgTable("users", {
   mfaEnabledAt: timestamp("mfa_enabled_at", { withTimezone: true }),
   // Último paso de tiempo TOTP aceptado: impide reutilizar un código ya usado.
   mfaLastUsedStep: integer("mfa_last_used_step"),
+  // Organización de la última sesión: el próximo login vuelve a ella si sigue siendo miembro.
+  lastOrganizationId: uuid("last_organization_id").references(() => organizations.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

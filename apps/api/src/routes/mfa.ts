@@ -11,7 +11,7 @@ import {
   enableMfa,
   findMfaChallenge,
   forOrganization,
-  getPrimaryMembership,
+  listMembershipsForUser,
   getUserById,
   registerFailedLogin,
   registerFailedMfaChallenge,
@@ -122,8 +122,11 @@ export async function mfaRoutes(app: FastifyInstance, { db, secureCookies, authR
     if (!challenge) return reply.code(401).send({ error: "El inicio de sesión venció; volvé a ingresar" });
 
     const user = await getUserById(db, challenge.userId);
-    const membership = user ? await getPrimaryMembership(db, user.id) : null;
-    if (!user || !user.mfaEnabledAt || !membership || membership.organizationId !== challenge.organizationId) {
+    // La membresía de la organización del desafío (la FK lo garantiza, pero el rol se lee ahora).
+    const membership = user
+      ? (await listMembershipsForUser(db, user.id)).find((m) => m.organizationId === challenge.organizationId)
+      : undefined;
+    if (!user || !user.mfaEnabledAt || !membership) {
       await deleteMfaChallenge(db, challenge.id);
       return reply.code(401).send({ error: INVALID });
     }

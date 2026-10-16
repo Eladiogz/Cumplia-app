@@ -237,6 +237,23 @@ describe("cambiar de organización activa", () => {
     expect(log.map((l) => l.action)).toContain("auth.switch_organization");
   });
 
+  it("al iniciar sesión vuelve a la última organización usada; si ya no es miembro, a la primera", async () => {
+    const client = await registerAdmin("Cliente");
+    const consultant = await registerAdmin("Consultora propia");
+    const inv = await invite(client.cookie, consultant.email);
+    let cookie = cookieOf(await call("POST", "/auth/invitations/accept", consultant.cookie, { token: inv.token }))!;
+
+    const login = () => call("POST", "/auth/login", undefined, { email: consultant.email, password: PASSWORD });
+    expect((await login()).json().organization.id).toBe(client.orgId);
+
+    cookie = cookieOf(await call("POST", "/auth/switch-organization", cookie, { organizationId: consultant.orgId }))!;
+    expect((await login()).json().organization.id).toBe(consultant.orgId);
+
+    await call("POST", "/auth/switch-organization", cookie, { organizationId: client.orgId });
+    expect((await call("DELETE", `/members/${consultant.userId}`, client.cookie)).statusCode).toBe(204);
+    expect((await login()).json().organization.id).toBe(consultant.orgId);
+  });
+
   it("no se puede pasar a una organización de la que no se es miembro", async () => {
     const me = await registerAdmin();
     const other = await registerAdmin();
