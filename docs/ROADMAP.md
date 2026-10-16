@@ -3,8 +3,11 @@
 ## Fase 1 — Fundación (esta entrega)
 Monorepo, CI/CD, datos de ISO 27001:2022, motor de puntaje, SoA, API stateless.
 
-## Fase 2 — Persistencia y accesos
-- Conectar Prisma + PostgreSQL, migraciones
+## Fase 2A — Persistencia (hecha)
+- Drizzle + PostgreSQL, migraciones, repositorio por organización, auditoría, tests de aislamiento
+
+## Fase 2B — Accesos
+- Conectar la API a la base de datos
 - Autenticación con MFA, roles ADMIN / CONSULTANT / AUDITOR
 - Aislamiento por organización en cada consulta (tests de fuga entre tenants)
 - Registro de auditoría de cada cambio
