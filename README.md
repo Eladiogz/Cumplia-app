@@ -68,3 +68,12 @@ curl -X POST localhost:3000/assessments -H "x-organization-id: <ID>" \
 El repositorio incluye solo los **títulos** de los controles (traducidos). El texto de la norma está protegido por ISO: para mostrar guías o requisitos completos hay que adquirir la licencia correspondiente o redactar contenido propio.
 
 Hoja de ruta en [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+Licencia
+Este proyecto es propietario.
+
+Todos los derechos reservados.
+
+No se permite el uso, copia, modificación, distribución o explotación comercial sin autorización expresa y por escrito del titular.
+
+
