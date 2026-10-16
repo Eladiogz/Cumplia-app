@@ -1,11 +1,13 @@
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
-import { organizationExists, type Db } from "@cumplia/db";
+import { findActiveSession, organizationExists, type Db, type Role } from "@cumplia/db";
+import { SESSION_COOKIE, hashToken } from "./security/session.js";
 
 /** Quién hace la petición y en nombre de qué organización. */
 export interface Tenant {
   organizationId: string;
   actorId: string | null;
+  role?: Role;
 }
 
 /** Devuelve el tenant de la petición o null si no está autenticada. */
@@ -19,10 +21,31 @@ declare module "fastify" {
 
 const Uuid = z.string().uuid();
 
+/** Autenticación real: cookie de sesión → usuario, organización y rol vigentes. */
+export function createSessionTenantResolver(db: Db): TenantResolver {
+  return async (req) => {
+    const token = req.cookies?.[SESSION_COOKIE];
+    if (!token) return null;
+    const session = await findActiveSession(db, hashToken(token));
+    if (!session) return null;
+    return { organizationId: session.organizationId, actorId: session.userId, role: session.role };
+  };
+}
+
+/** Prueba varios resolvers en orden; el primero que devuelva un tenant gana. */
+export function firstOf(...resolvers: TenantResolver[]): TenantResolver {
+  return async (req) => {
+    for (const resolve of resolvers) {
+      const tenant = await resolve(req);
+      if (tenant) return tenant;
+    }
+    return null;
+  };
+}
+
 /**
  * SOLO DESARROLLO. Toma la organización del header `x-organization-id`.
- * Cualquiera podría falsificarlo: se reemplaza por la autenticación real
- * (feat/auth-core) y server.ts no lo activa en producción.
+ * Cualquiera podría falsificarlo: server.ts no lo activa en producción.
  */
 export function createDevTenantResolver(db: Db): TenantResolver {
   return async (req) => {

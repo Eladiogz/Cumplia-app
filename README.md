@@ -45,18 +45,38 @@ Rutas por organización (requieren tenant; sin él responden 401):
 | POST | `/assessments/:id/evidence` | Registrar evidencia de un control |
 | GET | `/audit-log` | Registro de auditoría |
 
-### Probar en local (solo desarrollo)
-Mientras no exista el login (`feat/auth-core`), la organización se indica con un header. Está desactivado salvo que `ALLOW_DEV_TENANT_HEADER=true` y nunca funciona con `NODE_ENV=production`.
+### Autenticación
+Sesiones en el servidor con cookie `httpOnly` + `SameSite=Lax` (y `Secure` en producción). En la base solo se guarda el hash del token, así que se pueden revocar al instante.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/auth/register` | Crea usuario + organización (rol ADMIN) e inicia sesión |
+| POST | `/auth/login` | Inicia sesión |
+| POST | `/auth/logout` | Cierra y revoca la sesión |
+| GET | `/auth/me` | Usuario, organización y rol actuales |
+
+- Contraseñas con scrypt (N=2^16), mínimo 12 caracteres.
+- Bloqueo de cuenta tras 5 intentos fallidos (15 min); error idéntico para usuario inexistente y clave incorrecta.
+- Límite de 10 peticiones/minuto por IP en registro e inicio de sesión.
+- Peticiones que modifican datos desde un `Origin` no incluido en `APP_ORIGIN` se rechazan (403).
+- Registro de auditoría de altas, accesos correctos, fallidos y cierres de sesión.
+
+### Probar en local
 ```bash
 docker compose up -d db
-export DATABASE_URL=postgresql://cumplia:cumplia@localhost:5432/cumplia
-export ALLOW_DEV_TENANT_HEADER=true
+cp .env.example .env && set -a && . ./.env && set +a
 pnpm --filter @cumplia/db db:migrate
-pnpm --filter @cumplia/db db:seed "Mi empresa"     # imprime el ID de la organización
-pnpm dev:api
-curl -X POST localhost:3000/assessments -H "x-organization-id: <ID>" \
-  -H "content-type: application/json" -d '{"frameworkId":"iso27001-2022"}'
+pnpm dev:api          # en una terminal; dejala abierta
 ```
+En **otra** terminal:
+```bash
+curl -i -c cookies.txt -X POST localhost:3000/auth/register -H "content-type: application/json" \
+  -d '{"email":"yo@ejemplo.com","password":"una-clave-larga-123","organizationName":"Mi empresa"}'
+curl -b cookies.txt -X POST localhost:3000/assessments -H "content-type: application/json" \
+  -d '{"frameworkId":"iso27001-2022"}'
+curl -b cookies.txt localhost:3000/auth/me
+```
+El header `x-organization-id` (solo desarrollo) sigue disponible con `ALLOW_DEV_TENANT_HEADER=true`; nunca funciona con `NODE_ENV=production`.
 
 ## Flujo de trabajo Git
 - `main` protegida: solo entra por Pull Request con CI en verde.
