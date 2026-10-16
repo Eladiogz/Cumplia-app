@@ -32,8 +32,43 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash"),
   failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
   lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  // Secreto TOTP cifrado (AES-256-GCM) con una clave que NO está en la base.
+  // Con secreto y sin fecha de activación = configuración pendiente de confirmar.
+  mfaSecret: text("mfa_secret"),
+  mfaEnabledAt: timestamp("mfa_enabled_at", { withTimezone: true }),
+  // Último paso de tiempo TOTP aceptado: impide reutilizar un código ya usado.
+  mfaLastUsedStep: integer("mfa_last_used_step"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const mfaRecoveryCodes = pgTable(
+  "mfa_recovery_codes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    // Solo el hash: los códigos se muestran una única vez al activar MFA.
+    codeHash: text("code_hash").notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+  },
+  (t) => [unique("mfa_recovery_codes_user_code_uq").on(t.userId, t.codeHash)],
+);
+
+/**
+ * Segundo paso del inicio de sesión: la contraseña ya fue correcta y falta el código.
+ * Tabla aparte de `sessions` a propósito: un desafío jamás puede usarse como sesión.
+ */
+export const mfaChallenges = pgTable(
+  "mfa_challenges",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id").notNull().references(() => organizations.id),
+    tokenHash: text("token_hash").notNull().unique(),
+    attempts: integer("attempts").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("mfa_challenges_user_idx").on(t.userId)],
+);
 
 export const sessions = pgTable(
   "sessions",

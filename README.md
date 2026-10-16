@@ -61,10 +61,28 @@ Sesiones en el servidor con cookie `httpOnly` + `SameSite=Lax` (y `Secure` en pr
 - Peticiones que modifican datos desde un `Origin` no incluido en `APP_ORIGIN` se rechazan (403).
 - Registro de auditoría de altas, accesos correctos, fallidos y cierres de sesión.
 
+### Doble factor (MFA)
+TOTP compatible con Google Authenticator, Microsoft Authenticator, 1Password, etc.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/auth/mfa/setup` | Genera un secreto pendiente; devuelve `secret` y `otpauthUri` (para el QR) |
+| POST | `/auth/mfa/enable` | Confirma con `{ "code" }`; devuelve 10 códigos de recuperación (se muestran **una sola vez**) |
+| POST | `/auth/mfa/verify` | Segundo paso del login con `{ "code" }` o `{ "recoveryCode" }` |
+| POST | `/auth/mfa/disable` | Desactiva; exige `password` y un código |
+
+- Con MFA activo, `/auth/login` responde `{ "mfaRequired": true }` y una cookie de desafío (5 min, solo para `/auth/mfa`) que **no** sirve como sesión; la sesión se crea en `/auth/mfa/verify`.
+- El secreto se guarda cifrado con AES-256-GCM usando `MFA_ENCRYPTION_KEY` (fuera de la base); los códigos de recuperación, solo como hash.
+- Un código TOTP no se acepta dos veces; los fallos cuentan para el mismo bloqueo de cuenta que la contraseña.
+- Al activar MFA se cierran las demás sesiones abiertas del usuario.
+- Auditoría: `mfa.enabled`, `mfa.disabled`, `mfa.disable_failed`, `auth.mfa_failed`, `mfa.recovery_code_used`.
+
 ### Probar en local
 ```bash
 docker compose up -d db
-cp .env.example .env && set -a && . ./.env && set +a
+cp .env.example .env
+echo "MFA_ENCRYPTION_KEY=$(openssl rand -base64 32)" >> .env   # solo la primera vez
+set -a && . ./.env && set +a
 pnpm --filter @cumplia/db db:migrate
 pnpm dev:api          # en una terminal; dejala abierta
 ```

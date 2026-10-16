@@ -15,6 +15,13 @@
       "when": 1792170912523,
       "tag": "0001_blue_freak",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792185031845,
+      "tag": "0002_lethal_lizard",
+      "breakpoints": true
     }
   ]
 }
