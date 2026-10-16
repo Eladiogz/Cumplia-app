@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { Db } from "@cumplia/db";
 import { assessmentRoutes } from "./routes/assessments.js";
+import { invitationRoutes } from "./routes/invitations.js";
 import { organizationRoutes } from "./routes/organization.js";
 import { can } from "./security/permissions.js";
 import type { TenantResolver } from "./tenant.js";
@@ -42,4 +43,5 @@ export async function protectedRoutes(app: FastifyInstance, { db, resolveTenant 
 
   app.register(assessmentRoutes, { db });
   app.register(organizationRoutes, { db });
+  app.register(invitationRoutes, { db });
 }

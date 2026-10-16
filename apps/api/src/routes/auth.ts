@@ -30,8 +30,8 @@ export const MAX_ATTEMPTS = 5;
 export const LOCK_MINUTES = 15;
 export const INVALID = "Credenciales inválidas";
 
-const Email = z.string().trim().toLowerCase().email().max(254);
-const Password = z.string().min(12, "Mínimo 12 caracteres").max(128);
+export const Email = z.string().trim().toLowerCase().email().max(254);
+export const Password = z.string().min(12, "Mínimo 12 caracteres").max(128);
 
 const RegisterBody = z
   .object({

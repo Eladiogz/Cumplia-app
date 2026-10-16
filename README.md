@@ -14,7 +14,7 @@
 ### Multi-tenant: cómo se aíslan las organizaciones
 1. **Código**: todo acceso a datos de negocio pasa por `forOrganization(db, orgId)`; un recurso ajeno responde 404 (no revela que existe).
 2. **Base de datos**: FK compuestas `(id, organization_id)` entre evaluaciones, respuestas y evidencia; sesiones y desafíos MFA atados a la membresía `(user_id, organization_id)`. La base rechaza cualquier fila que mezcle organizaciones.
-3. **Row-Level Security**: en `assessments`, `control_answers`, `evidence` y `audit_logs`, Postgres solo devuelve y deja escribir filas de la organización fijada en la transacción (`forOrganization` lo hace siempre). Sin organización activa: ninguna fila. La API se conecta con un usuario del rol `cumplia_app`, sin privilegios de dueño; **en producción se niega a arrancar** si la conexión se saltearía RLS (superusuario, `BYPASSRLS` o dueño).
+3. **Row-Level Security**: en `assessments`, `control_answers`, `evidence`, `invitations` y `audit_logs`, Postgres solo devuelve y deja escribir filas de la organización fijada en la transacción (`forOrganization` lo hace siempre). Sin organización activa: ninguna fila. La API se conecta con un usuario del rol `cumplia_app`, sin privilegios de dueño; **en producción se niega a arrancar** si la conexión se saltearía RLS (superusuario, `BYPASSRLS` o dueño).
 4. **Auditoría inalterable**: un trigger impide `UPDATE`, `DELETE` y `TRUNCATE` sobre `audit_logs`, y el rol de la API ni siquiera tiene esos permisos.
 5. **Tests que se mantienen solos**: `tenant-isolation.test.ts` descubre todas las rutas protegidas y verifica que una organización no pueda leer ni modificar datos de otra; otro test exige RLS en toda tabla nueva con `organization_id`. Todos los tests corren con el mismo rol que la API.
 
@@ -65,6 +65,25 @@ Rutas por organización (requieren sesión; sin ella responden 401, sin el rol n
 | PATCH | `/organization` | Cambiar nombre o exigir MFA (`requireMfa`) | ADMIN |
 | GET | `/members` | Miembros, rol y si tienen MFA (revisión de accesos) | ADMIN, AUDITOR |
 | PATCH · DELETE | `/members/:userId` | Cambiar rol o quitar de la organización | ADMIN |
+| POST | `/invitations` | Invitar por email con un rol; devuelve el `token` **una sola vez** | ADMIN |
+| GET | `/invitations` | Invitaciones pendientes | ADMIN, AUDITOR |
+| DELETE | `/invitations/:invitationId` | Revocar una invitación | ADMIN |
+
+### Invitaciones y organización activa
+Rutas de la cuenta (no dependen de la organización activa):
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/auth/invitations/preview` | `{ token }` → organización, email y rol invitados |
+| POST | `/auth/invitations/accept` | Con sesión: la cuenta se une y pasa a esa organización. Sin sesión: `{ token, password, name? }` crea la cuenta |
+| GET | `/auth/organizations` | Organizaciones del usuario, con la activa marcada |
+| POST | `/auth/switch-organization` | `{ organizationId }` cambia la organización activa |
+
+- La invitación vence a los 7 días, sirve una vez y en la base solo queda el hash del token. Reinvitar al mismo email invalida el link anterior.
+- El email lo fija la invitación: un link reenviado no sirve para otra cuenta. Si el email ya tiene cuenta, hay que iniciar sesión para aceptar (se respetan su contraseña y su MFA).
+- Cambiar de organización (o aceptar con sesión) rota la sesión: la anterior se cierra y la nueva queda atada a la membresía elegida.
+- Hasta que exista envío de emails, el ADMIN comparte el link con el token por su cuenta.
+- La tabla `invitations` tiene RLS: la organización ve las suyas y quien acepta solo puede **leer** la invitación cuyo token presenta.
 
 ### Roles
 - **ADMIN**: todo. **CONSULTANT**: trabaja las evaluaciones; no ve auditoría ni administra. **AUDITOR**: solo lectura, incluida auditoría y miembros.

@@ -9,7 +9,6 @@ import {
   deleteOtherSessionsForUser,
   disableMfa,
   enableMfa,
-  findActiveSession,
   findMfaChallenge,
   forOrganization,
   getPrimaryMembership,
@@ -21,7 +20,7 @@ import {
 } from "@cumplia/db";
 import { decrypt, encrypt } from "../security/encryption.js";
 import { verifyPassword } from "../security/password.js";
-import { MFA_CHALLENGE_COOKIE, MFA_CHALLENGE_PATH, SESSION_COOKIE, hashToken, startSession } from "../security/session.js";
+import { MFA_CHALLENGE_COOKIE, MFA_CHALLENGE_PATH, currentSession, hashToken, startSession } from "../security/session.js";
 import {
   base32Encode,
   hashRecoveryCode,
@@ -64,13 +63,7 @@ export async function mfaRoutes(app: FastifyInstance, { db, secureCookies, authR
 
   const isLocked = (user: User) => (user.lockedUntil ? user.lockedUntil.getTime() > Date.now() : false);
 
-  /** Sesión completa (no un desafío MFA) del usuario que hace la petición. */
-  const currentUser = async (req: FastifyRequest) => {
-    const token = req.cookies[SESSION_COOKIE];
-    const session = token ? await findActiveSession(db, hashToken(token)) : null;
-    const user = session ? await getUserById(db, session.userId) : null;
-    return session && user ? { session, user, tokenHash: hashToken(token!) } : null;
-  };
+  const currentUser = (req: FastifyRequest) => currentSession(db, req);
 
   /** Verifica un código TOTP (sin reutilizar pasos) o gasta un código de recuperación. */
   const checkSecondFactor = async (user: User, input: { code?: string; recoveryCode?: string }) => {

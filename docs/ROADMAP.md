@@ -12,7 +12,8 @@ Monorepo, CI/CD, datos de ISO 27001:2022, motor de puntaje, SoA, API stateless.
 - Roles ADMIN / CONSULTANT / AUDITOR aplicados en cada ruta; MFA obligatorio por organización (hecho)
 - Integridad multi-tenant en la base (FK compuestas), auditoría inalterable y test automático de fuga entre organizaciones (hecho)
 - Row-Level Security en Postgres con un rol de aplicación sin privilegios (tercera barrera de aislamiento) (hecho)
-- Invitaciones para sumar miembros a una organización y elegir organización activa (consultores con varios clientes)
+- Invitaciones para sumar miembros a una organización y elegir organización activa (consultores con varios clientes) (hecho)
+- Envío de emails (invitaciones, avisos de seguridad) y recordar la última organización activa al iniciar sesión
 - Detalle en la auditoría (p. ej. rol anterior y nuevo)
 - Aislamiento por organización en cada consulta (tests de fuga entre tenants)
 - Registro de auditoría de cada cambio

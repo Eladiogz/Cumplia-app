@@ -177,6 +177,29 @@ export const evidence = pgTable(
   ],
 );
 
+/**
+ * Invitación a sumarse a una organización con un rol. El token viaja una sola vez
+ * (link) y aquí solo queda su hash. Protegida por RLS como el resto de los datos
+ * de la organización; quien acepta la lee presentando el hash del token (ver 0007).
+ */
+export const invitations = pgTable(
+  "invitations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull().references(() => organizations.id),
+    email: text("email").notNull(),
+    role: roleEnum("role").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    invitedBy: uuid("invited_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    acceptedBy: uuid("accepted_by").references(() => users.id),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [index("invitations_org_idx").on(t.organizationId)],
+);
+
 export const auditLogs = pgTable(
   "audit_logs",
   {
