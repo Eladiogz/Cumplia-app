@@ -4,14 +4,17 @@ import { eq } from "drizzle-orm";
 import { schema, type Role } from "@cumplia/db";
 import { createTestDb } from "@cumplia/db/testing";
 import { buildApp } from "../app.js";
+import { MemoryMailer } from "../email/mailer.js";
 import { SESSION_COOKIE, hashToken } from "../security/session.js";
 import { base32Decode, totp } from "../security/totp.js";
 import { createSessionTenantResolver } from "../tenant.js";
 
 let ctx: Awaited<ReturnType<typeof createTestDb>>;
 let app: ReturnType<typeof buildApp>;
+const mailer = new MemoryMailer();
 
 const PASSWORD = "clave-segura-de-prueba";
+const APP_URL = "https://app.cumplia.test";
 
 beforeAll(async () => {
   ctx = await createTestDb();
@@ -20,6 +23,8 @@ beforeAll(async () => {
     resolveTenant: createSessionTenantResolver(ctx.db),
     authRateLimit: 1000,
     mfaEncryptionKey: randomBytes(32),
+    mailer,
+    appUrl: APP_URL,
   });
 });
 afterAll(async () => {
@@ -47,22 +52,42 @@ const registerAdmin = async (organizationName = "Empresa") => {
   return { email, userId: body.user.id, orgId: body.organization.id, cookie: cookieOf(res)! };
 };
 
+/** Token tal como lo recibe la persona: del link del último email que le llegó. */
+const tokenFromEmail = (to: string) => {
+  const link = mailer.lastTo(to)?.text.match(/invitaciones\/aceptar#token=(\S+)/);
+  if (!link?.[1]) throw new Error(`No llegó la invitación a ${to}`);
+  return decodeURIComponent(link[1]);
+};
+
 const invite = async (adminCookie: string, email: string, role: Role = "CONSULTANT") => {
   const res = await call("POST", "/invitations", adminCookie, { email, role });
   expect(res.statusCode, res.body).toBe(201);
-  return res.json() as { id: string; token: string; email: string; role: Role };
+  const body = res.json() as { id: string; email: string; role: Role };
+  return { ...body, token: tokenFromEmail(body.email) };
 };
 
 const pendingIds = async (adminCookie: string) =>
   ((await call("GET", "/invitations", adminCookie)).json() as { id: string }[]).map((i) => i.id);
 
 describe("gestión de invitaciones", () => {
-  it("el ADMIN invita; el token se muestra una vez y en la base queda solo su hash", async () => {
-    const admin = await registerAdmin();
-    const inv = await invite(admin.cookie, "Nueva.Persona@Ejemplo.com", "AUDITOR");
-    expect(inv.email).toBe("nueva.persona@ejemplo.com");
-    expect(inv.token.length).toBeGreaterThanOrEqual(43);
+  it("el ADMIN invita; el token viaja SOLO por email y en la base queda su hash", async () => {
+    const admin = await registerAdmin("Estudio <Pérez> & Asoc.");
+    const res = await call("POST", "/invitations", admin.cookie, { email: "Nueva.Persona@Ejemplo.com", role: "AUDITOR" });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().email).toBe("nueva.persona@ejemplo.com");
+    expect(res.json().token).toBeUndefined();
 
+    const email = mailer.lastTo("nueva.persona@ejemplo.com")!;
+    expect(email.subject).toBe("Te invitaron a Estudio <Pérez> & Asoc. en Cumplia");
+    expect(email.text).toContain(`${admin.email} te invitó`);
+    expect(email.text).toContain("Auditor/a");
+    expect(email.text).toContain(`${APP_URL}/invitaciones/aceptar#token=`);
+    // El nombre de la organización lo eligió un usuario: en el HTML va escapado.
+    expect(email.html).toContain("Estudio &lt;Pérez&gt; &amp; Asoc.");
+    expect(email.html).not.toContain("<Pérez>");
+
+    const inv = { ...(res.json() as { id: string }), token: tokenFromEmail("nueva.persona@ejemplo.com") };
+    expect(inv.token.length).toBeGreaterThanOrEqual(43);
     const list = await call("GET", "/invitations", admin.cookie);
     expect(list.json()).toEqual([expect.objectContaining({ id: inv.id, role: "AUDITOR" })]);
     expect(list.body).not.toContain(inv.token);
@@ -83,6 +108,27 @@ describe("gestión de invitaciones", () => {
     expect((await call("DELETE", `/invitations/${inv.id}`, auditor.cookie)).statusCode).toBe(403);
     expect((await call("GET", "/invitations", auditor.cookie)).statusCode).toBe(200);
     expect((await call("GET", "/invitations", consultant.cookie)).statusCode).toBe(403);
+  });
+
+  it("si el email no sale, la invitación se revoca y se informa el error", async () => {
+    const failing = buildApp({
+      db: ctx.db,
+      resolveTenant: createSessionTenantResolver(ctx.db),
+      authRateLimit: 1000,
+      mailer: { send: async () => Promise.reject(new Error("SMTP caído")) },
+    });
+    const admin = await registerAdmin();
+    const res = await failing.inject({
+      method: "POST",
+      url: "/invitations",
+      payload: { email: uniqueEmail(), role: "AUDITOR" },
+      headers: { cookie: admin.cookie },
+    });
+    expect(res.statusCode).toBe(502);
+    expect(await pendingIds(admin.cookie)).toEqual([]);
+    const log = (await call("GET", "/audit-log", admin.cookie)).json() as { action: string; details: { reason?: string } | null }[];
+    expect(log.find((l) => l.action === "invitation.revoke")?.details?.reason).toBe("email_failed");
+    await failing.close();
   });
 
   it("no invita a quien ya es miembro", async () => {

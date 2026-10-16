@@ -333,7 +333,7 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
       );
     },
 
-    async revokeInvitation(invitationId: string) {
+    async revokeInvitation(invitationId: string, reason?: string) {
       await inTenant(async (tx) => {
         const rows = await tx
           .update(invitations)
@@ -342,7 +342,11 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
           .returning({ email: invitations.email, role: invitations.role });
         const [revoked] = rows;
         if (!revoked) throw new NotFoundError("Invitación");
-        await audit(tx, "invitation.revoke", "invitation", invitationId, { email: revoked.email, role: revoked.role });
+        await audit(tx, "invitation.revoke", "invitation", invitationId, {
+          email: revoked.email,
+          role: revoked.role,
+          ...(reason ? { reason } : {}),
+        });
       });
     },
   };

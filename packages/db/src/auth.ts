@@ -46,16 +46,21 @@ export async function getUserById(db: Db, id: string) {
   return user ?? null;
 }
 
-/** Suma un intento fallido y bloquea la cuenta al llegar al máximo. */
+/**
+ * Suma un intento fallido y bloquea la cuenta al llegar al máximo. Se llama solo
+ * con la cuenta desbloqueada, así que `true` significa "se bloqueó con este intento".
+ */
 export async function registerFailedLogin(db: Db, userId: string, maxAttempts: number, lockMinutes: number) {
-  await db
+  const [row] = await db
     .update(users)
     .set({
       failedLoginAttempts: sql`${users.failedLoginAttempts} + 1`,
       lockedUntil: sql`case when ${users.failedLoginAttempts} + 1 >= ${maxAttempts}
         then now() + make_interval(mins => ${lockMinutes}) else ${users.lockedUntil} end`,
     })
-    .where(eq(users.id, userId));
+    .where(eq(users.id, userId))
+    .returning({ attempts: users.failedLoginAttempts });
+  return (row?.attempts ?? 0) >= maxAttempts;
 }
 
 export async function clearLoginFailures(db: Db, userId: string) {

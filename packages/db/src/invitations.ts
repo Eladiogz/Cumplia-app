@@ -116,7 +116,12 @@ export async function registerFromInvitation(db: Db, input: { tokenHash: string;
 /** Organizaciones a las que pertenece el usuario (para elegir la activa). */
 export function listMembershipsForUser(db: Db, userId: string) {
   return db
-    .select({ organizationId: organizations.id, organizationName: organizations.name, role: memberships.role })
+    .select({
+      organizationId: organizations.id,
+      organizationName: organizations.name,
+      role: memberships.role,
+      requireMfa: organizations.requireMfa,
+    })
     .from(memberships)
     .innerJoin(organizations, eq(organizations.id, memberships.organizationId))
     .where(eq(memberships.userId, userId))

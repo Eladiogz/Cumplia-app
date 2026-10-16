@@ -13,11 +13,13 @@ import {
   forOrganization,
   listMembershipsForUser,
   getUserById,
-  registerFailedLogin,
   registerFailedMfaChallenge,
+  replaceRecoveryCodes,
   setPendingMfaSecret,
   type Db,
 } from "@cumplia/db";
+import { notify, type Mailer } from "../email/mailer.js";
+import { mfaDisabledEmail, mfaEnabledEmail, recoveryCodeUsedEmail } from "../email/templates.js";
 import { decrypt, encrypt } from "../security/encryption.js";
 import { verifyPassword } from "../security/password.js";
 import { MFA_CHALLENGE_COOKIE, MFA_CHALLENGE_PATH, currentSession, hashToken, startSession } from "../security/session.js";
@@ -29,7 +31,7 @@ import {
   otpauthUri,
   verifyTotp,
 } from "../security/totp.js";
-import { INVALID, LOCK_MINUTES, MAX_ATTEMPTS } from "./auth.js";
+import { INVALID, MAX_ATTEMPTS, failedAttempt } from "./auth.js";
 
 const SecondFactor = z
   .object({
@@ -52,9 +54,10 @@ interface Options {
   authRateLimit: number;
   /** Clave AES-256 (32 bytes) con la que se cifran los secretos TOTP. */
   encryptionKey: Buffer;
+  mailer: Mailer;
 }
 
-export async function mfaRoutes(app: FastifyInstance, { db, secureCookies, authRateLimit, encryptionKey }: Options) {
+export async function mfaRoutes(app: FastifyInstance, { db, secureCookies, authRateLimit, encryptionKey, mailer }: Options) {
   const strict = { config: { rateLimit: { max: authRateLimit, timeWindow: "1 minute" } } };
 
   // El id del usuario autentica el cifrado: un secreto no sirve copiado a otra fila.
@@ -111,6 +114,25 @@ export async function mfaRoutes(app: FastifyInstance, { db, secureCookies, authR
     // Cualquier otra sesión abierta se inició sin segundo factor: se cierra.
     await deleteOtherSessionsForUser(db, user.id, tokenHash);
     await forOrganization(db, session.organizationId, user.id).record("mfa.enabled", "user", user.id);
+    notify(mailer, req.log, mfaEnabledEmail(user.email));
+    return { recoveryCodes };
+  });
+
+  /** Genera códigos de recuperación nuevos (invalida los anteriores). Exige un código de la app. */
+  app.post("/auth/mfa/recovery-codes", strict, async (req, reply) => {
+    const current = await currentUser(req);
+    if (!current) return reply.code(401).send({ error: "No autenticado" });
+    const { user, session } = current;
+    if (!user.mfaEnabledAt) return reply.code(409).send({ error: "MFA no está activo" });
+
+    const { code } = EnableBody.parse(req.body);
+    if (isLocked(user) || (await checkSecondFactor(user, { code })) === null) {
+      if (!isLocked(user)) await failedAttempt(db, { mailer, log: req.log }, user);
+      return reply.code(403).send({ error: "Código inválido" });
+    }
+    const recoveryCodes = newRecoveryCodes();
+    await replaceRecoveryCodes(db, user.id, recoveryCodes.map(hashRecoveryCode));
+    await forOrganization(db, session.organizationId, user.id).record("mfa.recovery_codes_regenerated", "user", user.id);
     return { recoveryCodes };
   });
 
@@ -134,7 +156,7 @@ export async function mfaRoutes(app: FastifyInstance, { db, secureCookies, authR
 
     const method = isLocked(user) ? null : await checkSecondFactor(user, body);
     if (!method) {
-      if (!isLocked(user)) await registerFailedLogin(db, user.id, MAX_ATTEMPTS, LOCK_MINUTES);
+      if (!isLocked(user)) await failedAttempt(db, { mailer, log: req.log }, user);
       await registerFailedMfaChallenge(db, challenge.id, MAX_ATTEMPTS);
       await audit.record("auth.mfa_failed", "user", user.id, {
         reason: isLocked(user) ? "account_locked" : "invalid_code",
@@ -147,13 +169,17 @@ export async function mfaRoutes(app: FastifyInstance, { db, secureCookies, authR
     await clearLoginFailures(db, user.id);
     await startSession(db, reply, { userId: user.id, organizationId: challenge.organizationId, secureCookies });
     reply.clearCookie(MFA_CHALLENGE_COOKIE, { path: MFA_CHALLENGE_PATH });
-    if (method === "recovery") await audit.record("mfa.recovery_code_used", "user", user.id);
+    const remaining = method === "recovery" ? await countUnusedRecoveryCodes(db, user.id) : null;
+    if (remaining !== null) {
+      await audit.record("mfa.recovery_code_used", "user", user.id, { remaining });
+      notify(mailer, req.log, recoveryCodeUsedEmail(user.email, remaining));
+    }
     await audit.record("auth.login", "user", user.id);
     return {
       user: { id: user.id, email: user.email, name: user.name },
       organization: { id: membership.organizationId, name: membership.organizationName },
       role: membership.role,
-      ...(method === "recovery" ? { recoveryCodesRemaining: await countUnusedRecoveryCodes(db, user.id) } : {}),
+      ...(remaining !== null ? { recoveryCodesRemaining: remaining } : {}),
     };
   });
 
@@ -163,8 +189,12 @@ export async function mfaRoutes(app: FastifyInstance, { db, secureCookies, authR
     if (!current) return reply.code(401).send({ error: "No autenticado" });
     const { user, session } = current;
     if (!user.mfaEnabledAt) return reply.code(409).send({ error: "MFA no está activo" });
-    if (session.organizationRequiresMfa) {
-      return reply.code(409).send({ error: "Tu organización exige MFA: no se puede desactivar" });
+    // Cualquiera de sus organizaciones (no solo la activa) puede exigirlo.
+    const requiring = (await listMembershipsForUser(db, user.id)).filter((m) => m.requireMfa);
+    if (requiring.length > 0) {
+      return reply.code(409).send({
+        error: `No se puede desactivar: lo exige ${requiring.map((m) => m.organizationName).join(", ")}`,
+      });
     }
 
     const body = DisableBody.parse(req.body);
@@ -172,13 +202,14 @@ export async function mfaRoutes(app: FastifyInstance, { db, secureCookies, authR
     const passwordOk = !!user.passwordHash && (await verifyPassword(body.password, user.passwordHash));
     const ok = !isLocked(user) && passwordOk && (await checkSecondFactor(user, body)) !== null;
     if (!ok) {
-      if (!isLocked(user)) await registerFailedLogin(db, user.id, MAX_ATTEMPTS, LOCK_MINUTES);
+      if (!isLocked(user)) await failedAttempt(db, { mailer, log: req.log }, user);
       await audit.record("mfa.disable_failed", "user", user.id);
       return reply.code(403).send({ error: "No se pudo verificar tu identidad" });
     }
 
     await disableMfa(db, user.id);
     await audit.record("mfa.disabled", "user", user.id);
+    notify(mailer, req.log, mfaDisabledEmail(user.email));
     return reply.code(204).send();
   });
 }

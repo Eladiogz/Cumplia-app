@@ -2,7 +2,7 @@
 
 **Cumplimiento sin planillas.** Plataforma GRC para pymes y consultores de LATAM: evaluá tu madurez frente a ISO 27001, generá la Declaración de Aplicabilidad y seguí las brechas, todo en español.
 
-## Estado: Fases 1 y 2A completas · Fase 2B (accesos) en curso
+## Estado: Fases 1, 2A y 2B completas · próxima: Fase 3 (aplicación web)
 - Monorepo TypeScript (pnpm): `apps/api`, `packages/frameworks`, `packages/core`
 - Los 93 controles del Anexo A de ISO/IEC 27001:2022 como datos versionados
 - Motor de puntaje de madurez (escala 0-4), brechas priorizadas y Declaración de Aplicabilidad (SoA)
@@ -26,7 +26,7 @@ corepack enable
 pnpm install
 pnpm build
 pnpm test
-docker compose up -d db   # PostgreSQL local (crea el usuario cumplia_api)
+docker compose up -d db mail   # PostgreSQL (crea el usuario cumplia_api) y Mailpit (http://localhost:8025)
 cp .env.example .env
 echo "MFA_ENCRYPTION_KEY=$(openssl rand -base64 32)" >> .env
 set -a && . ./.env && set +a
@@ -65,7 +65,7 @@ Rutas por organización (requieren sesión; sin ella responden 401, sin el rol n
 | PATCH | `/organization` | Cambiar nombre o exigir MFA (`requireMfa`) | ADMIN |
 | GET | `/members` | Miembros, rol y si tienen MFA (revisión de accesos) | ADMIN, AUDITOR |
 | PATCH · DELETE | `/members/:userId` | Cambiar rol o quitar de la organización | ADMIN |
-| POST | `/invitations` | Invitar por email con un rol; devuelve el `token` **una sola vez** | ADMIN |
+| POST | `/invitations` | Invitar por email con un rol (el link viaja **solo** por email) | ADMIN |
 | GET | `/invitations` | Invitaciones pendientes | ADMIN, AUDITOR |
 | DELETE | `/invitations/:invitationId` | Revocar una invitación | ADMIN |
 
@@ -82,7 +82,13 @@ Rutas de la cuenta (no dependen de la organización activa):
 - La invitación vence a los 7 días, sirve una vez y en la base solo queda el hash del token. Reinvitar al mismo email invalida el link anterior.
 - El email lo fija la invitación: un link reenviado no sirve para otra cuenta. Si el email ya tiene cuenta, hay que iniciar sesión para aceptar (se respetan su contraseña y su MFA).
 - Cambiar de organización (o aceptar con sesión) rota la sesión: la anterior se cierra y la nueva queda atada a la membresía elegida.
-- Hasta que exista envío de emails, el ADMIN comparte el link con el token por su cuenta.
+- El token viaja **solo** en el email (`APP_URL/invitaciones/aceptar#token=…`, en el fragmento para que no llegue a ningún servidor ni al `Referer`): aceptar demuestra que la persona controla esa casilla; ni el ADMIN que invita lo ve. Si el email no sale, la invitación se revoca y la API responde 502.
+- Al iniciar sesión se entra a la última organización usada (si sigue siendo miembro; si no, a la primera).
+
+### Emails
+- Producción: `SMTP_URL` obligatorio (cualquier proveedor SMTP) y `MAIL_FROM`. Desarrollo: Mailpit (`docker compose up -d mail`, bandeja en http://localhost:8025); sin `SMTP_URL`, los emails se escriben en el log de la API.
+- Avisos de seguridad (en segundo plano, no demoran ni hacen fallar la respuesta): MFA activado, MFA desactivado, ingreso con código de recuperación (con cuántos quedan) y cuenta bloqueada por intentos fallidos (una vez por bloqueo).
+- Los datos que cargan los usuarios (p. ej. nombre de la organización) se escapan en el HTML.
 - La tabla `invitations` tiene RLS: la organización ve las suyas y quien acepta solo puede **leer** la invitación cuyo token presenta.
 
 ### Roles
@@ -116,13 +122,14 @@ TOTP compatible con Google Authenticator, Microsoft Authenticator, 1Password, et
 | POST | `/auth/mfa/setup` | Genera un secreto pendiente; devuelve `secret` y `otpauthUri` (para el QR) |
 | POST | `/auth/mfa/enable` | Confirma con `{ "code" }`; devuelve 10 códigos de recuperación (se muestran **una sola vez**) |
 | POST | `/auth/mfa/verify` | Segundo paso del login con `{ "code" }` o `{ "recoveryCode" }` |
-| POST | `/auth/mfa/disable` | Desactiva; exige `password` y un código |
+| POST | `/auth/mfa/recovery-codes` | Genera 10 códigos de recuperación nuevos con `{ "code" }` (invalida los anteriores) |
+| POST | `/auth/mfa/disable` | Desactiva; exige `password` y un código. No se puede si **alguna** de sus organizaciones exige MFA |
 
 - Con MFA activo, `/auth/login` responde `{ "mfaRequired": true }` y una cookie de desafío (5 min, solo para `/auth/mfa`) que **no** sirve como sesión; la sesión se crea en `/auth/mfa/verify`.
 - El secreto se guarda cifrado con AES-256-GCM usando `MFA_ENCRYPTION_KEY` (fuera de la base); los códigos de recuperación, solo como hash.
 - Un código TOTP no se acepta dos veces; los fallos cuentan para el mismo bloqueo de cuenta que la contraseña.
 - Al activar MFA se cierran las demás sesiones abiertas del usuario.
-- Auditoría: `mfa.enabled`, `mfa.disabled`, `mfa.disable_failed`, `auth.mfa_failed`, `mfa.recovery_code_used`.
+- Auditoría: `mfa.enabled`, `mfa.disabled`, `mfa.disable_failed`, `auth.mfa_failed`, `mfa.recovery_code_used`, `mfa.recovery_codes_regenerated`. Cada evento puede llevar `details` (p. ej. rol anterior y nuevo, motivo de un fallo); nunca secretos.
 
 ### Probar en local
 Con la base y el `.env` preparados como en [Empezar](#empezar), dejá `pnpm dev:api` corriendo en una terminal. En **otra** terminal:

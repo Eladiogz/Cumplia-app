@@ -27,6 +27,14 @@ export async function enableMfa(db: Db, userId: string, usedStep: number, recove
   });
 }
 
+/** Reemplaza todos los códigos de recuperación (los anteriores dejan de servir). */
+export async function replaceRecoveryCodes(db: Db, userId: string, recoveryCodeHashes: string[]) {
+  await db.transaction(async (tx) => {
+    await tx.delete(mfaRecoveryCodes).where(eq(mfaRecoveryCodes.userId, userId));
+    await tx.insert(mfaRecoveryCodes).values(recoveryCodeHashes.map((codeHash) => ({ userId, codeHash })));
+  });
+}
+
 export async function disableMfa(db: Db, userId: string) {
   await db.transaction(async (tx) => {
     await tx

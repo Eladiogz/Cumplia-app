@@ -6,6 +6,7 @@ import { ZodError, z } from "zod";
 import { listFrameworks, loadFramework } from "@cumplia/frameworks";
 import { AnswerSchema, buildStatementOfApplicability, scoreAssessment } from "@cumplia/core";
 import { ConflictError, NotFoundError, ValidationError, type Db } from "@cumplia/db";
+import { createLogMailer, type Mailer } from "./email/mailer.js";
 import { accountRoutes } from "./routes/account.js";
 import { authRoutes } from "./routes/auth.js";
 import { mfaRoutes } from "./routes/mfa.js";
@@ -32,6 +33,10 @@ export interface AppOptions {
    * (los usuarios con MFA activo no pueden completar el login: falla cerrado).
    */
   mfaEncryptionKey?: Buffer;
+  /** Envío de emails. Si se omite, se escriben en el log (solo desarrollo y tests). */
+  mailer?: Mailer;
+  /** URL del frontend para los links de los emails. Por defecto, el primer origen autorizado. */
+  appUrl?: string;
 }
 
 export function buildApp({
@@ -41,8 +46,11 @@ export function buildApp({
   allowedOrigins = [],
   authRateLimit = 10,
   mfaEncryptionKey,
+  mailer: givenMailer,
+  appUrl = allowedOrigins[0] ?? "http://localhost:3001",
 }: AppOptions = {}) {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
+  const mailer = givenMailer ?? createLogMailer(app.log);
 
   app.register(helmet);
   app.register(cookie);
@@ -105,12 +113,12 @@ export function buildApp({
   });
 
   if (db) {
-    app.register(authRoutes, { db, secureCookies, authRateLimit });
+    app.register(authRoutes, { db, secureCookies, authRateLimit, mailer });
     app.register(accountRoutes, { db, secureCookies, authRateLimit });
     if (mfaEncryptionKey) {
-      app.register(mfaRoutes, { db, secureCookies, authRateLimit, encryptionKey: mfaEncryptionKey });
+      app.register(mfaRoutes, { db, secureCookies, authRateLimit, encryptionKey: mfaEncryptionKey, mailer });
     }
-    app.register(protectedRoutes, { db, resolveTenant });
+    app.register(protectedRoutes, { db, resolveTenant, mailer, appUrl });
   }
 
   return app;

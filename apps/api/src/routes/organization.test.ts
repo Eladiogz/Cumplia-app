@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { createSession, schema, type Role } from "@cumplia/db";
 import { createTestDb } from "@cumplia/db/testing";
 import { buildApp } from "../app.js";
+import { MemoryMailer } from "../email/mailer.js";
 import { can } from "../security/permissions.js";
 import { SESSION_COOKIE, hashToken, newSessionToken, sessionExpiry } from "../security/session.js";
 import { base32Decode, totp } from "../security/totp.js";
@@ -227,7 +228,7 @@ describe("rutas protegidas", () => {
     const Fastify = (await import("fastify")).default;
     const bad = Fastify();
     bad.register(async (scope) => {
-      await protectedRoutes(scope, { db: ctx.db, resolveTenant: () => null });
+      await protectedRoutes(scope, { db: ctx.db, resolveTenant: () => null, mailer: new MemoryMailer(), appUrl: "http://x" });
       scope.get("/sin-permiso", async () => "ups");
     });
     await expect(bad.ready()).rejects.toThrow(/sin permiso declarado/);
