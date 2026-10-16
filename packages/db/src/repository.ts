@@ -10,7 +10,6 @@ import {
   evidence,
   memberships,
   organizations,
-  sessions,
   users,
 } from "./schema.js";
 
@@ -237,7 +236,10 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
       });
     },
 
-    /** Quita al usuario de la organización y cierra sus sesiones en ella. Nunca deja a la organización sin ADMIN. */
+    /**
+     * Quita al usuario de la organización. Sus sesiones y desafíos MFA en ella se
+     * borran en cascada (FK a la membresía). Nunca deja a la organización sin ADMIN.
+     */
     async removeMember(userId: string) {
       await db.transaction(async (tx) => {
         const member = await lockMemberAndAdmins(tx, userId);
@@ -245,9 +247,6 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
         await tx
           .delete(memberships)
           .where(and(eq(memberships.userId, userId), eq(memberships.organizationId, organizationId)));
-        await tx
-          .delete(sessions)
-          .where(and(eq(sessions.userId, userId), eq(sessions.organizationId, organizationId)));
         await audit(tx, "member.remove", "user", userId);
       });
     },
