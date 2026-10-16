@@ -25,13 +25,38 @@ pnpm --filter @cumplia/db db:migrate   # aplica las migraciones
 # tras cambiar src/schema.ts: pnpm --filter @cumplia/db db:generate
 ```
 
-## API (Fase 1, sin estado)
+## API
+Rutas públicas (sin estado):
+
 | Método | Ruta | Descripción |
 |---|---|---|
 | GET | `/health` | Estado del servicio |
-| GET | `/frameworks` | Marcos disponibles |
-| GET | `/frameworks/:id` | Controles de un marco |
-| POST | `/frameworks/:id/assessment` | Puntaje, brechas y SoA a partir de las respuestas |
+| GET | `/frameworks` · `/frameworks/:id` | Marcos disponibles y sus controles |
+| POST | `/frameworks/:id/assessment` | Calcula puntaje, brechas y SoA sin guardar nada |
+
+Rutas por organización (requieren tenant; sin él responden 401):
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST · GET | `/assessments` | Crear y listar evaluaciones |
+| GET | `/assessments/:id` | Detalle |
+| GET · PUT | `/assessments/:id/answers` | Leer y guardar respuestas |
+| GET | `/assessments/:id/result` · `/soa` | Puntaje y Declaración de Aplicabilidad |
+| POST | `/assessments/:id/evidence` | Registrar evidencia de un control |
+| GET | `/audit-log` | Registro de auditoría |
+
+### Probar en local (solo desarrollo)
+Mientras no exista el login (`feat/auth-core`), la organización se indica con un header. Está desactivado salvo que `ALLOW_DEV_TENANT_HEADER=true` y nunca funciona con `NODE_ENV=production`.
+```bash
+docker compose up -d db
+export DATABASE_URL=postgresql://cumplia:cumplia@localhost:5432/cumplia
+export ALLOW_DEV_TENANT_HEADER=true
+pnpm --filter @cumplia/db db:migrate
+pnpm --filter @cumplia/db db:seed "Mi empresa"     # imprime el ID de la organización
+pnpm dev:api
+curl -X POST localhost:3000/assessments -H "x-organization-id: <ID>" \
+  -H "content-type: application/json" -d '{"frameworkId":"iso27001-2022"}'
+```
 
 ## Flujo de trabajo Git
 - `main` protegida: solo entra por Pull Request con CI en verde.

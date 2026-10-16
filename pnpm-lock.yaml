@@ -32,6 +32,9 @@ importers:
       '@cumplia/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@cumplia/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@cumplia/frameworks':
         specifier: workspace:*
         version: link:../../packages/frameworks
