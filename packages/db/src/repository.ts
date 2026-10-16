@@ -11,6 +11,21 @@ export class NotFoundError extends Error {
   }
 }
 
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ValidationError";
+  }
+}
+
+export async function organizationExists(db: Db, organizationId: string) {
+  const [row] = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId));
+  return row !== undefined;
+}
+
 export async function createOrganization(db: Db, name: string) {
   const [org] = await db.insert(organizations).values({ name }).returning();
   if (!org) throw new Error("No se pudo crear la organización");
@@ -38,7 +53,11 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
 
   return {
     async createAssessment(frameworkId: string, targetMaturity = 3) {
-      loadFramework(frameworkId); // valida que exista
+      try {
+        loadFramework(frameworkId); // valida que exista
+      } catch {
+        throw new ValidationError(`Marco normativo desconocido: ${frameworkId}`);
+      }
       return db.transaction(async (tx) => {
         const [a] = await tx
           .insert(assessments)
@@ -70,7 +89,7 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
         if (!assessment) throw new NotFoundError("Evaluación");
         const valid = new Set(framework(assessment.frameworkId).controls.map((c) => c.id));
         for (const a of answers) {
-          if (!valid.has(a.controlId)) throw new Error(`Control inexistente: ${a.controlId}`);
+          if (!valid.has(a.controlId)) throw new ValidationError(`Control inexistente: ${a.controlId}`);
           const values = {
             organizationId,
             assessmentId,
