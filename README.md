@@ -2,13 +2,14 @@
 
 **Cumplimiento sin planillas.** Plataforma GRC para pymes y consultores de LATAM: evaluá tu madurez frente a ISO 27001, generá la Declaración de Aplicabilidad y seguí las brechas, todo en español.
 
-## Estado: Fase 1 (fundación)
+## Estado: Fase 1 completa · Fase 2A (persistencia)
 - Monorepo TypeScript (pnpm): `apps/api`, `packages/frameworks`, `packages/core`
 - Los 93 controles del Anexo A de ISO/IEC 27001:2022 como datos versionados
 - Motor de puntaje de madurez (escala 0-4), brechas priorizadas y Declaración de Aplicabilidad (SoA)
 - API Fastify con helmet y rate limit
 - CI en GitHub Actions (build, lint, typecheck, tests, auditoría), CodeQL y Dependabot
-- Esquema de base de datos multi-tenant (`apps/api/prisma/schema.prisma`), aún no conectado
+- `packages/db`: PostgreSQL con Drizzle ORM, migraciones versionadas y acceso a datos **siempre acotado por organización** (`forOrganization`), con registro de auditoría en cada cambio
+- Tests de aislamiento entre organizaciones sobre Postgres real en memoria (PGlite), sin Docker
 
 ## Empezar
 ```bash
@@ -17,7 +18,11 @@ pnpm install
 pnpm build
 pnpm test
 pnpm dev:api        # http://localhost:3000/health
-docker compose up -d db   # PostgreSQL local (se usa desde la Fase 2)
+docker compose up -d db   # PostgreSQL local
+cp .env.example .env
+export DATABASE_URL=postgresql://cumplia:cumplia@localhost:5432/cumplia
+pnpm --filter @cumplia/db db:migrate   # aplica las migraciones
+# tras cambiar src/schema.ts: pnpm --filter @cumplia/db db:generate
 ```
 
 ## API (Fase 1, sin estado)
