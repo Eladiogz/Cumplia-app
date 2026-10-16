@@ -20,7 +20,7 @@ const routes: { method: string; url: string }[] = [];
 const PASSWORD = "clave-segura-de-prueba";
 
 // Datos de la organización A que B nunca debe ver ni tocar.
-const A = { orgId: "", assessmentId: "", memberId: "", memberEmail: "", adminEmail: "" };
+const A = { orgId: "", assessmentId: "", memberId: "", memberEmail: "", adminEmail: "", invitationId: "", invitedEmail: "" };
 let cookieA = "";
 let cookieB = "";
 
@@ -28,6 +28,7 @@ let cookieB = "";
 const PARAMS: Record<string, () => string> = {
   id: () => A.assessmentId,
   userId: () => A.memberId,
+  invitationId: () => A.invitationId,
 };
 
 /** Cuerpos válidos: así la petición llega hasta la verificación de pertenencia (y no muere en un 400). */
@@ -79,8 +80,17 @@ beforeAll(async () => {
   A.memberId = member.body.user.id;
   await ctx.db.insert(schema.memberships).values({ userId: A.memberId, organizationId: A.orgId, role: "CONSULTANT" });
 
+  A.invitedEmail = "invitada-a@ejemplo.com";
+  const invitation = await repoA.createInvitation({
+    email: A.invitedEmail,
+    role: "AUDITOR",
+    tokenHash: "hash-de-prueba-a",
+    expiresAt: new Date(Date.now() + 86_400_000),
+  });
+  A.invitationId = invitation.id;
+
   cookieB = (await register("admin-b@ejemplo.com", "Organización B")).cookie;
-}, 60_000); // tres registros con scrypt + migraciones: lento bajo carga en paralelo
+});
 afterAll(async () => {
   await app.close();
   await ctx.close();
@@ -111,7 +121,7 @@ describe("aislamiento entre organizaciones en todas las rutas protegidas", () =>
   });
 
   it("los listados de B no contienen nada de A", async () => {
-    const secrets = [A.orgId, A.assessmentId, A.memberId, A.memberEmail, A.adminEmail, "evidencia de A"];
+    const secrets = [A.orgId, A.assessmentId, A.memberId, A.memberEmail, A.adminEmail, A.invitationId, A.invitedEmail, "evidencia de A"];
     for (const { url } of routes.filter((r) => r.method === "GET" && !r.url.includes(":"))) {
       const res = await call("GET", url, cookieB);
       expect(res.statusCode, url).toBe(200);
@@ -126,5 +136,8 @@ describe("aislamiento entre organizaciones en todas las rutas protegidas", () =>
     expect(members.find((m) => m.userId === A.memberId)?.role).toBe("CONSULTANT");
     const log = (await call("GET", "/audit-log", cookieA)).json() as { action: string }[];
     expect(log.map((l) => l.action)).not.toContain("member.remove");
+    expect(log.map((l) => l.action)).not.toContain("invitation.revoke");
+    const pendingInvitations = (await call("GET", "/invitations", cookieA)).json() as { id: string }[];
+    expect(pendingInvitations.map((i) => i.id)).toContain(A.invitationId);
   });
 });

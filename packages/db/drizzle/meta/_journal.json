@@ -50,6 +50,13 @@
       "when": 1792188742256,
       "tag": "0006_row_level_security",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792190749130,
+      "tag": "0007_invitations",
+      "breakpoints": true
     }
   ]
 }

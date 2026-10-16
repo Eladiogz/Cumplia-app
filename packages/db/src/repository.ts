@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { AnswerSchema, scoreAssessment, type Answer, type AssessmentResult } from "@cumplia/core";
 import { loadFramework } from "@cumplia/frameworks";
 import type { Role } from "./auth.js";
@@ -8,6 +8,7 @@ import {
   auditLogs,
   controlAnswers,
   evidence,
+  invitations,
   memberships,
   organizations,
   users,
@@ -49,6 +50,18 @@ export async function createOrganization(db: Db, name: string) {
 }
 
 export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/** Ni aceptada ni revocada (el vencimiento se controla aparte). */
+export const pending = and(isNull(invitations.acceptedAt), isNull(invitations.revokedAt));
+
+/** Columnas de una invitación que se pueden mostrar: nunca el hash del token. */
+export const invitationPublicColumns = {
+  id: invitations.id,
+  email: invitations.email,
+  role: invitations.role,
+  createdAt: invitations.createdAt,
+  expiresAt: invitations.expiresAt,
+};
 
 /**
  * Fija la organización activa para Row-Level Security, solo dentro de esta
@@ -275,6 +288,56 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
           .delete(memberships)
           .where(and(eq(memberships.userId, userId), eq(memberships.organizationId, organizationId)));
         await audit(tx, "member.remove", "user", userId);
+      });
+    },
+
+    /**
+     * Crea una invitación. Si el email ya tenía una pendiente, la reemplaza (la
+     * anterior queda revocada). Falla si la persona ya es miembro.
+     */
+    async createInvitation(input: { email: string; role: Role; tokenHash: string; expiresAt: Date }) {
+      return inTenant(async (tx) => {
+        const [already] = await tx
+          .select({ id: memberships.id })
+          .from(memberships)
+          .innerJoin(users, eq(users.id, memberships.userId))
+          .where(and(eq(memberships.organizationId, organizationId), eq(users.email, input.email)));
+        if (already) throw new ConflictError("Esa persona ya es miembro de la organización");
+
+        await tx
+          .update(invitations)
+          .set({ revokedAt: sql`now()` })
+          .where(and(eq(invitations.organizationId, organizationId), eq(invitations.email, input.email), pending));
+        const [inv] = await tx
+          .insert(invitations)
+          .values({ organizationId, invitedBy: actorId, ...input })
+          .returning(invitationPublicColumns);
+        if (!inv) throw new Error("No se pudo crear la invitación");
+        await audit(tx, "invitation.create", "invitation", inv.id);
+        return inv;
+      });
+    },
+
+    /** Invitaciones pendientes y vigentes (nunca devuelve el hash del token). */
+    listInvitations() {
+      return inTenant((tx) =>
+        tx
+          .select(invitationPublicColumns)
+          .from(invitations)
+          .where(and(eq(invitations.organizationId, organizationId), pending, gt(invitations.expiresAt, sql`now()`)))
+          .orderBy(desc(invitations.createdAt)),
+      );
+    },
+
+    async revokeInvitation(invitationId: string) {
+      await inTenant(async (tx) => {
+        const rows = await tx
+          .update(invitations)
+          .set({ revokedAt: sql`now()` })
+          .where(and(eq(invitations.id, invitationId), eq(invitations.organizationId, organizationId), pending))
+          .returning({ id: invitations.id });
+        if (rows.length === 0) throw new NotFoundError("Invitación");
+        await audit(tx, "invitation.revoke", "invitation", invitationId);
       });
     },
   };

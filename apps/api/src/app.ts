@@ -6,6 +6,7 @@ import { ZodError, z } from "zod";
 import { listFrameworks, loadFramework } from "@cumplia/frameworks";
 import { AnswerSchema, buildStatementOfApplicability, scoreAssessment } from "@cumplia/core";
 import { ConflictError, NotFoundError, ValidationError, type Db } from "@cumplia/db";
+import { accountRoutes } from "./routes/account.js";
 import { authRoutes } from "./routes/auth.js";
 import { mfaRoutes } from "./routes/mfa.js";
 import { protectedRoutes } from "./protected.js";
@@ -105,6 +106,7 @@ export function buildApp({
 
   if (db) {
     app.register(authRoutes, { db, secureCookies, authRateLimit });
+    app.register(accountRoutes, { db, secureCookies, authRateLimit });
     if (mfaEncryptionKey) {
       app.register(mfaRoutes, { db, secureCookies, authRateLimit, encryptionKey: mfaEncryptionKey });
     }
