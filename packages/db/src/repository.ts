@@ -1,8 +1,18 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { AnswerSchema, scoreAssessment, type Answer, type AssessmentResult } from "@cumplia/core";
 import { loadFramework } from "@cumplia/frameworks";
+import type { Role } from "./auth.js";
 import type { Db } from "./client.js";
-import { assessments, auditLogs, controlAnswers, evidence, organizations } from "./schema.js";
+import {
+  assessments,
+  auditLogs,
+  controlAnswers,
+  evidence,
+  memberships,
+  organizations,
+  sessions,
+  users,
+} from "./schema.js";
 
 export class NotFoundError extends Error {
   constructor(what: string) {
@@ -175,5 +185,104 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
         .orderBy(desc(auditLogs.createdAt))
         .limit(limit);
     },
+
+    async getOrganization() {
+      const [org] = await db
+        .select({ id: organizations.id, name: organizations.name, requireMfa: organizations.requireMfa })
+        .from(organizations)
+        .where(eq(organizations.id, organizationId));
+      if (!org) throw new NotFoundError("Organización");
+      return org;
+    },
+
+    async updateOrganization(changes: { name?: string; requireMfa?: boolean }) {
+      return db.transaction(async (tx) => {
+        const [org] = await tx
+          .update(organizations)
+          .set(changes)
+          .where(eq(organizations.id, organizationId))
+          .returning({ id: organizations.id, name: organizations.name, requireMfa: organizations.requireMfa });
+        if (!org) throw new NotFoundError("Organización");
+        await audit(tx, "organization.update", "organization", organizationId);
+        return org;
+      });
+    },
+
+    listMembers() {
+      return db
+        .select({
+          userId: users.id,
+          email: users.email,
+          name: users.name,
+          role: memberships.role,
+          mfaEnabled: sql<boolean>`${users.mfaEnabledAt} is not null`,
+        })
+        .from(memberships)
+        .innerJoin(users, eq(users.id, memberships.userId))
+        .where(eq(memberships.organizationId, organizationId))
+        .orderBy(asc(users.email));
+    },
+
+    /** Cambia el rol. Nunca deja a la organización sin ADMIN. */
+    async changeMemberRole(userId: string, role: Role) {
+      return db.transaction(async (tx) => {
+        const member = await lockMemberAndAdmins(tx, userId);
+        if (member.role === "ADMIN" && role !== "ADMIN") await assertAnotherAdmin(tx, userId);
+        await tx
+          .update(memberships)
+          .set({ role })
+          .where(and(eq(memberships.userId, userId), eq(memberships.organizationId, organizationId)));
+        await audit(tx, "member.role_change", "user", userId);
+        return { userId, role };
+      });
+    },
+
+    /** Quita al usuario de la organización y cierra sus sesiones en ella. Nunca deja a la organización sin ADMIN. */
+    async removeMember(userId: string) {
+      await db.transaction(async (tx) => {
+        const member = await lockMemberAndAdmins(tx, userId);
+        if (member.role === "ADMIN") await assertAnotherAdmin(tx, userId);
+        await tx
+          .delete(memberships)
+          .where(and(eq(memberships.userId, userId), eq(memberships.organizationId, organizationId)));
+        await tx
+          .delete(sessions)
+          .where(and(eq(sessions.userId, userId), eq(sessions.organizationId, organizationId)));
+        await audit(tx, "member.remove", "user", userId);
+      });
+    },
   };
+
+  /**
+   * Bloquea las filas de ADMIN de la organización y la del miembro: dos cambios
+   * simultáneos (p. ej. dos ADMIN quitándose entre sí) se serializan.
+   */
+  async function lockMemberAndAdmins(tx: Tx, userId: string) {
+    await tx
+      .select({ id: memberships.id })
+      .from(memberships)
+      .where(and(eq(memberships.organizationId, organizationId), eq(memberships.role, "ADMIN")))
+      .for("update");
+    const [member] = await tx
+      .select({ role: memberships.role })
+      .from(memberships)
+      .where(and(eq(memberships.userId, userId), eq(memberships.organizationId, organizationId)))
+      .for("update");
+    if (!member) throw new NotFoundError("Miembro");
+    return member;
+  }
+
+  async function assertAnotherAdmin(tx: Tx, exceptUserId: string) {
+    const [row] = await tx
+      .select({ n: sql<number>`count(*)::int` })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.organizationId, organizationId),
+          eq(memberships.role, "ADMIN"),
+          sql`${memberships.userId} <> ${exceptUserId}`,
+        ),
+      );
+    if (!row || row.n === 0) throw new ConflictError("La organización debe tener al menos un ADMIN");
+  }
 }

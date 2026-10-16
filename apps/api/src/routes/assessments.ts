@@ -3,7 +3,7 @@ import { z } from "zod";
 import { AnswerSchema, buildStatementOfApplicability } from "@cumplia/core";
 import { loadFramework } from "@cumplia/frameworks";
 import { NotFoundError, forOrganization, type Db } from "@cumplia/db";
-import type { TenantResolver } from "../tenant.js";
+import { requires } from "../security/permissions.js";
 
 const IdParams = z.object({ id: z.string().uuid() });
 const CreateBody = z.object({
@@ -19,58 +19,52 @@ const EvidenceBody = z.object({
 
 interface Options {
   db: Db;
-  resolveTenant: TenantResolver;
 }
 
+const READ = requires("assessment:read");
+const WRITE = requires("assessment:write");
+
+/** Se registra dentro de protectedRoutes: tenant y permisos ya están verificados. */
 export async function assessmentRoutes(app: FastifyInstance, opts: Options) {
-  app.decorateRequest("tenant", null);
-
-  // Falla cerrado: sin tenant válido no se llega a ninguna ruta de este plugin.
-  app.addHook("preHandler", async (req, reply) => {
-    const tenant = await opts.resolveTenant(req);
-    if (!tenant) return reply.code(401).send({ error: "No autenticado" });
-    req.tenant = tenant;
-  });
-
   const repo = (req: FastifyRequest) => {
     if (!req.tenant) throw new Error("Tenant ausente");
     return forOrganization(opts.db, req.tenant.organizationId, req.tenant.actorId);
   };
 
-  app.post("/assessments", async (req, reply) => {
+  app.post("/assessments", WRITE, async (req, reply) => {
     const body = CreateBody.parse(req.body);
     const created = await repo(req).createAssessment(body.frameworkId, body.targetMaturity);
     return reply.code(201).send(created);
   });
 
-  app.get("/assessments", async (req) => repo(req).listAssessments());
+  app.get("/assessments", READ, async (req) => repo(req).listAssessments());
 
-  app.get("/assessments/:id", async (req) => {
+  app.get("/assessments/:id", READ, async (req) => {
     const { id } = IdParams.parse(req.params);
     const found = await repo(req).getAssessment(id);
     if (!found) throw new NotFoundError("Evaluación");
     return found;
   });
 
-  app.get("/assessments/:id/answers", async (req) => {
+  app.get("/assessments/:id/answers", READ, async (req) => {
     const { id } = IdParams.parse(req.params);
     const r = repo(req);
     if (!(await r.getAssessment(id))) throw new NotFoundError("Evaluación");
     return r.getAnswers(id);
   });
 
-  app.put("/assessments/:id/answers", async (req) => {
+  app.put("/assessments/:id/answers", WRITE, async (req) => {
     const { id } = IdParams.parse(req.params);
     const { answers } = AnswersBody.parse(req.body);
     return { saved: await repo(req).saveAnswers(id, answers) };
   });
 
-  app.get("/assessments/:id/result", async (req) => {
+  app.get("/assessments/:id/result", READ, async (req) => {
     const { id } = IdParams.parse(req.params);
     return repo(req).computeResult(id);
   });
 
-  app.get("/assessments/:id/soa", async (req) => {
+  app.get("/assessments/:id/soa", READ, async (req) => {
     const { id } = IdParams.parse(req.params);
     const r = repo(req);
     const found = await r.getAssessment(id);
@@ -78,13 +72,12 @@ export async function assessmentRoutes(app: FastifyInstance, opts: Options) {
     return buildStatementOfApplicability(loadFramework(found.frameworkId), await r.getAnswers(id));
   });
 
-  app.post("/assessments/:id/evidence", async (req, reply) => {
+  app.post("/assessments/:id/evidence", WRITE, async (req, reply) => {
     const { id } = IdParams.parse(req.params);
     const body = EvidenceBody.parse(req.body);
     const ev = await repo(req).addEvidence(id, body.controlId, body.source, body.description);
     return reply.code(201).send(ev);
   });
 
-  // TODO(feat/rbac): restringir a ADMIN y AUDITOR
-  app.get("/audit-log", async (req) => repo(req).listAuditLog());
+  app.get("/audit-log", requires("audit:read"), async (req) => repo(req).listAuditLog());
 }

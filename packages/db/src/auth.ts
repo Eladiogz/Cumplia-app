@@ -86,7 +86,10 @@ export async function createSession(
   return row;
 }
 
-/** Sesión vigente + rol actual. Si quitaron al usuario de la organización, deja de ser válida. */
+/**
+ * Sesión vigente + rol actual (se lee en cada petición: un cambio de rol rige al instante).
+ * Si quitaron al usuario de la organización, deja de ser válida.
+ */
 export async function findActiveSession(db: Db, tokenHash: string) {
   const [row] = await db
     .select({
@@ -95,12 +98,16 @@ export async function findActiveSession(db: Db, tokenHash: string) {
       organizationId: sessions.organizationId,
       role: memberships.role,
       expiresAt: sessions.expiresAt,
+      userMfaEnabled: sql<boolean>`${users.mfaEnabledAt} is not null`,
+      organizationRequiresMfa: organizations.requireMfa,
     })
     .from(sessions)
     .innerJoin(
       memberships,
       and(eq(memberships.userId, sessions.userId), eq(memberships.organizationId, sessions.organizationId)),
     )
+    .innerJoin(users, eq(users.id, sessions.userId))
+    .innerJoin(organizations, eq(organizations.id, sessions.organizationId))
     .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, sql`now()`)));
   return row ?? null;
 }

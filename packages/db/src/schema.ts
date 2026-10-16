@@ -21,6 +21,8 @@ export const roleEnum = pgEnum("role", ["ADMIN", "CONSULTANT", "AUDITOR"]);
 export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
+  // Política: todos los miembros deben tener MFA activo para operar.
+  requireMfa: boolean("require_mfa").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

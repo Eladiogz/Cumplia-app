@@ -164,6 +164,9 @@ export async function mfaRoutes(app: FastifyInstance, { db, secureCookies, authR
     if (!current) return reply.code(401).send({ error: "No autenticado" });
     const { user, session } = current;
     if (!user.mfaEnabledAt) return reply.code(409).send({ error: "MFA no está activo" });
+    if (session.organizationRequiresMfa) {
+      return reply.code(409).send({ error: "Tu organización exige MFA: no se puede desactivar" });
+    }
 
     const body = DisableBody.parse(req.body);
     const audit = forOrganization(db, session.organizationId, user.id);

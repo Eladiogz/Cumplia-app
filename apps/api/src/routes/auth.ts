@@ -150,6 +150,8 @@ export async function authRoutes(app: FastifyInstance, { db, secureCookies, auth
       organizationId: session.organizationId,
       role: session.role,
       mfaEnabled: user.mfaEnabledAt !== null,
+      // El frontend lo usa para llevar al usuario a configurar MFA antes que nada.
+      mfaSetupRequired: session.organizationRequiresMfa && user.mfaEnabledAt === null,
     };
   });
 }
