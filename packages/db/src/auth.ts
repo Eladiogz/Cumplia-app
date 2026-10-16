@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, lt, sql } from "drizzle-orm";
+import { and, asc, eq, gt, lt, ne, sql } from "drizzle-orm";
 import type { Db } from "./client.js";
 import { ConflictError } from "./repository.js";
 import { auditLogs, memberships, organizations, sessions, users } from "./schema.js";
@@ -111,6 +111,11 @@ export async function deleteSession(db: Db, tokenHash: string) {
 
 export async function deleteSessionsForUser(db: Db, userId: string) {
   await db.delete(sessions).where(eq(sessions.userId, userId));
+}
+
+/** Cierra todas las sesiones del usuario salvo la indicada (p. ej. al activar MFA). */
+export async function deleteOtherSessionsForUser(db: Db, userId: string, keepTokenHash: string) {
+  await db.delete(sessions).where(and(eq(sessions.userId, userId), ne(sessions.tokenHash, keepTokenHash)));
 }
 
 export async function deleteExpiredSessions(db: Db) {

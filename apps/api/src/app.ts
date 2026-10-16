@@ -8,6 +8,7 @@ import { AnswerSchema, buildStatementOfApplicability, scoreAssessment } from "@c
 import { ConflictError, NotFoundError, ValidationError, type Db } from "@cumplia/db";
 import { authRoutes } from "./routes/auth.js";
 import { assessmentRoutes } from "./routes/assessments.js";
+import { mfaRoutes } from "./routes/mfa.js";
 import type { TenantResolver } from "./tenant.js";
 
 const AssessmentBody = z.object({
@@ -23,11 +24,23 @@ export interface AppOptions {
   secureCookies?: boolean;
   /** Orígenes del frontend autorizados a hacer peticiones que modifican datos. */
   allowedOrigins?: string[];
-  /** Peticiones por minuto y por IP a /auth/register y /auth/login. */
+  /** Peticiones por minuto y por IP a /auth/register, /auth/login y /auth/mfa/*. */
   authRateLimit?: number;
+  /**
+   * Clave AES-256 para los secretos TOTP. Sin ella no se registran las rutas de MFA
+   * (los usuarios con MFA activo no pueden completar el login: falla cerrado).
+   */
+  mfaEncryptionKey?: Buffer;
 }
 
-export function buildApp({ db, resolveTenant = () => null, secureCookies = false, allowedOrigins = [], authRateLimit = 10 }: AppOptions = {}) {
+export function buildApp({
+  db,
+  resolveTenant = () => null,
+  secureCookies = false,
+  allowedOrigins = [],
+  authRateLimit = 10,
+  mfaEncryptionKey,
+}: AppOptions = {}) {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
 
   app.register(helmet);
@@ -92,6 +105,9 @@ export function buildApp({ db, resolveTenant = () => null, secureCookies = false
 
   if (db) {
     app.register(authRoutes, { db, secureCookies, authRateLimit });
+    if (mfaEncryptionKey) {
+      app.register(mfaRoutes, { db, secureCookies, authRateLimit, encryptionKey: mfaEncryptionKey });
+    }
     app.register(assessmentRoutes, { db, resolveTenant });
   }
 

@@ -1,9 +1,14 @@
 import { createDb } from "@cumplia/db";
 import { buildApp } from "./app.js";
+import { parseEncryptionKey } from "./security/encryption.js";
 import { createDevTenantResolver, createSessionTenantResolver, firstOf } from "./tenant.js";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("Falta DATABASE_URL");
+
+const mfaKey = process.env.MFA_ENCRYPTION_KEY;
+if (!mfaKey) throw new Error("Falta MFA_ENCRYPTION_KEY (generala con: openssl rand -base64 32)");
+const mfaEncryptionKey = parseEncryptionKey(mfaKey);
 
 const isProd = process.env.NODE_ENV === "production";
 const { db, pool } = createDb(url);
@@ -16,6 +21,7 @@ const app = buildApp({
   db,
   resolveTenant: devTenant ? firstOf(session, createDevTenantResolver(db)) : session,
   secureCookies: isProd,
+  mfaEncryptionKey,
   allowedOrigins: (process.env.APP_ORIGIN ?? "http://localhost:3001").split(",").map((o) => o.trim()),
 });
 app.addHook("onClose", async () => {
