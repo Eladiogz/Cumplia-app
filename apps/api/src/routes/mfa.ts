@@ -22,7 +22,7 @@ import { notify, type Mailer } from "../email/mailer.js";
 import { mfaDisabledEmail, mfaEnabledEmail, recoveryCodeUsedEmail } from "../email/templates.js";
 import { decrypt, encrypt } from "../security/encryption.js";
 import { verifyPassword } from "../security/password.js";
-import { MFA_CHALLENGE_COOKIE, MFA_CHALLENGE_PATH, currentSession, hashToken, startSession } from "../security/session.js";
+import { MFA_CHALLENGE_COOKIE, currentSession, hashToken, startSession } from "../security/session.js";
 import {
   base32Encode,
   hashRecoveryCode,
@@ -55,9 +55,13 @@ interface Options {
   /** Clave AES-256 (32 bytes) con la que se cifran los secretos TOTP. */
   encryptionKey: Buffer;
   mailer: Mailer;
+  mfaCookiePath: string;
 }
 
-export async function mfaRoutes(app: FastifyInstance, { db, secureCookies, authRateLimit, encryptionKey, mailer }: Options) {
+export async function mfaRoutes(
+  app: FastifyInstance,
+  { db, secureCookies, authRateLimit, encryptionKey, mailer, mfaCookiePath }: Options,
+) {
   const strict = { config: { rateLimit: { max: authRateLimit, timeWindow: "1 minute" } } };
 
   // El id del usuario autentica el cifrado: un secreto no sirve copiado a otra fila.
@@ -168,7 +172,7 @@ export async function mfaRoutes(app: FastifyInstance, { db, secureCookies, authR
     await deleteMfaChallenge(db, challenge.id);
     await clearLoginFailures(db, user.id);
     await startSession(db, reply, { userId: user.id, organizationId: challenge.organizationId, secureCookies });
-    reply.clearCookie(MFA_CHALLENGE_COOKIE, { path: MFA_CHALLENGE_PATH });
+    reply.clearCookie(MFA_CHALLENGE_COOKIE, { path: mfaCookiePath });
     const remaining = method === "recovery" ? await countUnusedRecoveryCodes(db, user.id) : null;
     if (remaining !== null) {
       await audit.record("mfa.recovery_code_used", "user", user.id, { remaining });

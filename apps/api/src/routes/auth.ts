@@ -20,7 +20,6 @@ import { dummyHash, hashPassword, verifyPassword } from "../security/password.js
 import {
   MFA_CHALLENGE_COOKIE,
   MFA_CHALLENGE_MINUTES,
-  MFA_CHALLENGE_PATH,
   SESSION_COOKIE,
   hashToken,
   mfaChallengeExpiry,
@@ -52,6 +51,8 @@ interface Options {
   /** Máximo de peticiones por minuto y por IP a registro e inicio de sesión. */
   authRateLimit: number;
   mailer: Mailer;
+  /** Ruta (vista desde el navegador) a la que viaja la cookie del desafío MFA. */
+  mfaCookiePath: string;
 }
 
 /**
@@ -68,7 +69,7 @@ export async function failedAttempt(
   }
 }
 
-export async function authRoutes(app: FastifyInstance, { db, secureCookies, authRateLimit, mailer }: Options) {
+export async function authRoutes(app: FastifyInstance, { db, secureCookies, authRateLimit, mailer, mfaCookiePath }: Options) {
   // Límite propio y más estricto que el global para frenar fuerza bruta.
   const strict = { config: { rateLimit: { max: authRateLimit, timeWindow: "1 minute" } } };
 
@@ -80,7 +81,7 @@ export async function authRoutes(app: FastifyInstance, { db, secureCookies, auth
       httpOnly: true,
       secure: secureCookies,
       sameSite: "strict",
-      path: MFA_CHALLENGE_PATH,
+      path: mfaCookiePath,
       maxAge: MFA_CHALLENGE_MINUTES * 60,
     });
   };

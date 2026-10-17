@@ -12,6 +12,7 @@ let ctx: Awaited<ReturnType<typeof createTestDb>>;
 let app: ReturnType<typeof buildApp>;
 
 const PASSWORD = "clave-segura-de-prueba";
+const KEY = randomBytes(32);
 
 beforeAll(async () => {
   ctx = await createTestDb();
@@ -19,7 +20,7 @@ beforeAll(async () => {
     db: ctx.db,
     resolveTenant: createSessionTenantResolver(ctx.db),
     authRateLimit: 1000,
-    mfaEncryptionKey: randomBytes(32),
+    mfaEncryptionKey: KEY,
   });
 });
 afterAll(async () => {
@@ -227,6 +228,17 @@ describe("desactivación de MFA", () => {
     expect(cookieOf(login)).toBeTruthy();
     const log = (await get("/audit-log", cookieOf(login))).json() as { action: string }[];
     expect(log.map((l) => l.action)).toEqual(expect.arrayContaining(["mfa.disable_failed", "mfa.disabled"]));
+  });
+});
+
+describe("detrás del proxy de la web", () => {
+  it("la cookie del desafío viaja a la ruta que ve el navegador (/api/auth/mfa)", async () => {
+    const { email } = await registerWithMfa();
+    const proxied = buildApp({ db: ctx.db, authRateLimit: 1000, mfaEncryptionKey: KEY, publicPathPrefix: "/api" });
+    const res = await proxied.inject({ method: "POST", url: "/auth/login", payload: { email, password: PASSWORD } });
+    const c = res.cookies.find((x) => x.name === MFA_CHALLENGE_COOKIE) as Record<string, unknown>;
+    expect(c.path).toBe("/api/auth/mfa");
+    await proxied.close();
   });
 });
 
