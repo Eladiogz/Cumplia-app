@@ -37,7 +37,7 @@ export function NewPasswordField({
   const hintId = useId();
   const failed = checkPassword(value, context);
   const strength = passwordStrength(value, context);
-  const extra = failed.filter((r) => r === "repeated" || r === "personal" || r === "common");
+  const extra = failed.filter((r) => r === "tooLong" || r === "repeated" || r === "personal" || r === "common");
 
   return (
     <div className="grid gap-1.5">

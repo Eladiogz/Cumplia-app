@@ -20,7 +20,7 @@ const routes: { method: string; url: string }[] = [];
 const PASSWORD = "Clave-Segura-de-Prueba-2026";
 
 // Datos de la organización A que B nunca debe ver ni tocar.
-const A = { orgId: "", assessmentId: "", memberId: "", memberEmail: "", adminEmail: "", invitationId: "", invitedEmail: "" };
+const A = { orgId: "", assessmentId: "", memberId: "", memberEmail: "", adminEmail: "", invitationId: "", invitedEmail: "", evidenceId: "" };
 let cookieA = "";
 let cookieB = "";
 
@@ -29,12 +29,14 @@ const PARAMS: Record<string, () => string> = {
   id: () => A.assessmentId,
   userId: () => A.memberId,
   invitationId: () => A.invitationId,
+  evidenceId: () => A.evidenceId,
 };
 
 /** Cuerpos válidos: así la petición llega hasta la verificación de pertenencia (y no muere en un 400). */
 const BODIES: Record<string, object> = {
   "PUT /assessments/:id/answers": { answers: [{ controlId: "A.5.1", applicable: true, maturity: 4 }] },
   "PATCH /assessments/:id": { name: "Renombrada por otra organización" },
+  "POST /assessments/:id/evidence/files": {},
   "POST /assessments/:id/evidence": { controlId: "A.5.1", source: "manual", description: "intrusa" },
   "PATCH /members/:userId": { role: "AUDITOR" },
   "POST /members/:userId/password-reset": {},
@@ -75,7 +77,7 @@ beforeAll(async () => {
   const repoA = forOrganization(ctx.db, A.orgId, a.body.user.id);
   A.assessmentId = (await repoA.createAssessment("iso27001-2022")).id;
   await repoA.saveAnswers(A.assessmentId, [{ controlId: "A.5.1", applicable: true, maturity: 1 }]);
-  await repoA.addEvidence(A.assessmentId, "A.5.1", "manual", "evidencia de A");
+  A.evidenceId = (await repoA.addEvidence(A.assessmentId, "A.5.1", "manual", "evidencia de A")).id;
 
   // Un segundo miembro en A, para las rutas de miembros.
   A.memberEmail = "consultor-a@ejemplo.com";
