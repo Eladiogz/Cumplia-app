@@ -35,7 +35,15 @@ const devTenant = process.env.ALLOW_DEV_TENANT_HEADER === "true" && !isProd;
 const session = createSessionTenantResolver(db);
 const allowedOrigins = (process.env.APP_ORIGIN ?? "http://localhost:3001").split(",").map((o) => o.trim());
 
+/** TRUST_PROXY: IPs/CIDR del proxy separadas por coma (recomendado), o true/false. */
+const parseTrustProxy = (value: string | undefined): boolean | string => {
+  if (!value || value === "false") return false;
+  return value === "true" ? true : value;
+};
+
 const app = buildApp({
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
+  publicPathPrefix: process.env.API_PUBLIC_PREFIX ?? "",
   db,
   resolveTenant: devTenant ? firstOf(session, createDevTenantResolver(db)) : session,
   secureCookies: isProd,

@@ -214,6 +214,27 @@ describe("protecciones", () => {
     expect(good.statusCode).toBe(201);
   });
 
+  it("detrás del proxy, el límite es por IP real (X-Forwarded-For) y solo si viene del proxy", async () => {
+    const login = (target: ReturnType<typeof buildApp>, from: string, forwardedFor: string) =>
+      target.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email: "a@b.com", password: "x" },
+        remoteAddress: from,
+        headers: { "x-forwarded-for": forwardedFor },
+      });
+
+    const behindProxy = buildApp({ db: ctx.db, authRateLimit: 2, trustProxy: "127.0.0.1" });
+    for (let i = 0; i < 2; i++) await login(behindProxy, "127.0.0.1", "203.0.113.1");
+    expect((await login(behindProxy, "127.0.0.1", "203.0.113.1")).statusCode).toBe(429);
+    // Otro usuario detrás del mismo proxy tiene su propio cupo.
+    expect((await login(behindProxy, "127.0.0.1", "203.0.113.2")).statusCode).not.toBe(429);
+    // Alguien que NO es el proxy no puede inventarse otra IP para esquivar el límite.
+    for (let i = 0; i < 2; i++) await login(behindProxy, "198.51.100.7", `10.0.0.${i}`);
+    expect((await login(behindProxy, "198.51.100.7", "10.0.0.99")).statusCode).toBe(429);
+    await behindProxy.close();
+  });
+
   it("limita los intentos por minuto en login y registro", async () => {
     const limited = buildApp({ db: ctx.db, authRateLimit: 3 });
     const codes: number[] = [];

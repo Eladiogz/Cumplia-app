@@ -11,6 +11,7 @@ import { accountRoutes } from "./routes/account.js";
 import { authRoutes } from "./routes/auth.js";
 import { mfaRoutes } from "./routes/mfa.js";
 import { protectedRoutes } from "./protected.js";
+import { MFA_CHALLENGE_PATH } from "./security/session.js";
 import type { TenantResolver } from "./tenant.js";
 
 const AssessmentBody = z.object({
@@ -37,6 +38,14 @@ export interface AppOptions {
   mailer?: Mailer;
   /** URL del frontend para los links de los emails. Por defecto, el primer origen autorizado. */
   appUrl?: string;
+  /**
+   * Proxies de confianza (p. ej. "127.0.0.1" para el proxy de la web). Solo de ellos se
+   * acepta X-Forwarded-For: sin esto, detrás del proxy todos compartirían el límite por IP;
+   * con `true` a ciegas, cualquiera podría falsificar su IP.
+   */
+  trustProxy?: boolean | string;
+  /** Prefijo con el que el navegador ve la API (p. ej. "/api" detrás del proxy de la web). */
+  publicPathPrefix?: string;
 }
 
 export function buildApp({
@@ -48,9 +57,13 @@ export function buildApp({
   mfaEncryptionKey,
   mailer: givenMailer,
   appUrl = allowedOrigins[0] ?? "http://localhost:3001",
+  trustProxy = false,
+  publicPathPrefix = "",
 }: AppOptions = {}) {
-  const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
+  const app = Fastify({ logger: process.env.NODE_ENV !== "test", trustProxy });
   const mailer = givenMailer ?? createLogMailer(app.log);
+  // La cookie del desafío MFA solo viaja a sus rutas, tal como las ve el navegador.
+  const mfaCookiePath = `${publicPathPrefix.replace(/\/$/, "")}${MFA_CHALLENGE_PATH}`;
 
   app.register(helmet);
   app.register(cookie);
@@ -113,10 +126,10 @@ export function buildApp({
   });
 
   if (db) {
-    app.register(authRoutes, { db, secureCookies, authRateLimit, mailer });
+    app.register(authRoutes, { db, secureCookies, authRateLimit, mailer, mfaCookiePath });
     app.register(accountRoutes, { db, secureCookies, authRateLimit });
     if (mfaEncryptionKey) {
-      app.register(mfaRoutes, { db, secureCookies, authRateLimit, encryptionKey: mfaEncryptionKey, mailer });
+      app.register(mfaRoutes, { db, secureCookies, authRateLimit, encryptionKey: mfaEncryptionKey, mailer, mfaCookiePath });
     }
     app.register(protectedRoutes, { db, resolveTenant, mailer, appUrl });
   }

@@ -2,8 +2,9 @@
 
 **Cumplimiento sin planillas.** Plataforma GRC para pymes y consultores de LATAM: evaluá tu madurez frente a ISO 27001, generá la Declaración de Aplicabilidad y seguí las brechas, todo en español.
 
-## Estado: Fases 1, 2A y 2B completas · próxima: Fase 3 (aplicación web)
-- Monorepo TypeScript (pnpm): `apps/api`, `packages/frameworks`, `packages/core`
+## Estado: Fases 1, 2A y 2B completas · Fase 3 (aplicación web) en curso
+- Monorepo TypeScript (pnpm): `apps/api`, `apps/web`, `packages/frameworks`, `packages/core`, `packages/db`
+- `apps/web`: Next.js + Tailwind + componentes estilo shadcn/ui. Por ahora: ingreso, registro, verificación en dos pasos, aceptar invitaciones, selector de organización, seguridad (MFA) y organización (miembros, invitaciones, MFA obligatorio)
 - Los 93 controles del Anexo A de ISO/IEC 27001:2022 como datos versionados
 - Motor de puntaje de madurez (escala 0-4), brechas priorizadas y Declaración de Aplicabilidad (SoA)
 - API Fastify con helmet y rate limit
@@ -28,12 +29,21 @@ pnpm build
 pnpm test
 docker compose up -d db mail   # PostgreSQL (crea el usuario cumplia_api) y Mailpit (http://localhost:8025)
 cp .env.example .env
-echo "MFA_ENCRYPTION_KEY=$(openssl rand -base64 32)" >> .env
+sed -i "s|^MFA_ENCRYPTION_KEY=.*|MFA_ENCRYPTION_KEY=$(openssl rand -base64 32)|" .env
 set -a && . ./.env && set +a
 pnpm --filter @cumplia/db db:migrate   # con MIGRATION_DATABASE_URL (dueño)
-pnpm dev:api        # http://localhost:3000/health, con DATABASE_URL (cumplia_api)
+pnpm dev:api        # terminal 1: API en http://localhost:3000 (con DATABASE_URL = cumplia_api)
+pnpm dev:web        # terminal 2 (con el .env cargado): web en http://localhost:3001
 # tras cambiar src/schema.ts: pnpm --filter @cumplia/db db:generate
 ```
+Abrí **http://localhost:3001**: la web reenvía `/api/*` a la API (mismo origen, sin CORS; la cookie de sesión funciona sola). Los emails (invitaciones, avisos) se ven en Mailpit: http://localhost:8025.
+
+### Web y API detrás del proxy
+- `API_URL`: a dónde reenvía la web `/api/*`. Se lee **al compilar** la web (`next build`) y al arrancarla.
+- `API_PUBLIC_PREFIX=/api`: la API sabe que el navegador la ve bajo `/api` (p. ej. para la ruta de la cookie del segundo paso del login).
+- `TRUST_PROXY`: IPs del proxy (la web). Solo de ellas la API acepta `X-Forwarded-For`; así el límite de intentos es por usuario real y nadie más puede falsificar su IP.
+- `APP_ORIGIN` debe ser el origen de la web (protección CSRF) y es la base de los links de los emails.
+- La web solo muestra u oculta controles según el rol; **quien decide es siempre la API**.
 
 **Si ya tenías el volumen de Postgres creado** (el script de inicio solo corre con un volumen nuevo), creá el usuario de la API una vez:
 ```bash
