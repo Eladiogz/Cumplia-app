@@ -118,8 +118,37 @@ Sesiones en el servidor con cookie `httpOnly` + `SameSite=Lax` (y `Secure` en pr
 | POST | `/auth/logout` | Cierra y revoca la sesión |
 | GET | `/auth/me` | Usuario, organización y rol actuales |
 
-- Contraseñas con scrypt (N=2^16), mínimo 12 caracteres.
-- Bloqueo de cuenta tras 5 intentos fallidos (15 min); error idéntico para usuario inexistente y clave incorrecta.
+- Contraseñas con scrypt (N=2^16). Bloqueo de cuenta tras 5 intentos fallidos (15 min, con aviso por email); error idéntico para usuario inexistente y clave incorrecta.
+
+### Política de contraseñas
+Definida una sola vez en `@cumplia/core/password` (la web la usa para guiar con medidor y lista de requisitos; la API la aplica):
+- Entre 12 y 128 caracteres, con **mayúscula, minúscula, número y carácter especial**.
+- Sin el mismo carácter 4 veces seguidas.
+- Sin datos de la persona: email, nombre, organización ni «Cumplia».
+- **No puede ser común ni filtrada**: lista local con las 10.000 más usadas en filtraciones (SecLists) + términos frecuentes en español, detectadas aunque tengan números/símbolos de relleno o leetspeak (`P@ssw0rd2024!` → `password`). Sin servicios externos.
+- La API responde 400 `WEAK_PASSWORD` con las reglas que fallaron.
+
+### Recuperación y verificación
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/auth/password/forgot` | `{ email }` → siempre 202 y el mismo mensaje (no revela si la cuenta existe) |
+| POST | `/auth/password/reset` | `{ token, newPassword }` con el link del email |
+| POST | `/auth/password` | Cambiar estando dentro: `{ currentPassword, newPassword }` |
+| POST | `/auth/email/verify` | `{ token }` confirma el email |
+| POST | `/auth/email/verification` | Reenvía el link de confirmación |
+
+- El link de restablecimiento vence a los **30 minutos**, sirve una vez y solo vale el último enviado. La contraseña nueva se valida antes de gastar el link. Al restablecer se cierran **todas** las sesiones, se desbloquea la cuenta y **se sigue pidiendo MFA** al ingresar.
+- Cambiar la contraseña exige la actual y cierra las otras sesiones. Ambos casos avisan por email y quedan en la auditoría de cada organización de la persona.
+- El registro directo envía un link de confirmación (24 h). Sin confirmar se puede usar Cumplia, pero **no invitar** (403 `EMAIL_NOT_VERIFIED`). Las cuentas creadas por invitación ya vienen verificadas.
+
+### Acciones del ADMIN sobre un miembro (seguras para multi-tenant)
+Una cuenta puede pertenecer a varias organizaciones (p. ej. un consultor con varios clientes), así que el ADMIN de una **nunca** toca la contraseña ni debilita el acceso de las demás:
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/members/:userId/password-reset` | Le envía un link para que **la persona** elija una contraseña nueva (el ADMIN no la ve ni la fija) |
+| POST | `/members/:userId/sessions/revoke` | Cierra sus sesiones **en esta organización** |
+| DELETE | `/members/:userId/mfa` | Restablece su MFA **solo si la cuenta pertenece únicamente a esta organización**, y solo si el ADMIN tiene MFA activo |
 - Límite de 10 peticiones/minuto por IP en registro e inicio de sesión.
 - Peticiones que modifican datos desde un `Origin` no incluido en `APP_ORIGIN` se rechazan (403).
 - Registro de auditoría de altas, accesos correctos, fallidos y cierres de sesión.
@@ -145,7 +174,7 @@ TOTP compatible con Google Authenticator, Microsoft Authenticator, 1Password, et
 Con la base y el `.env` preparados como en [Empezar](#empezar), dejá `pnpm dev:api` corriendo en una terminal. En **otra** terminal:
 ```bash
 curl -i -c cookies.txt -X POST localhost:3000/auth/register -H "content-type: application/json" \
-  -d '{"email":"yo@ejemplo.com","password":"una-clave-larga-123","organizationName":"Mi empresa"}'
+  -d '{"email":"yo@ejemplo.com","password":"Mate-con-Bizcochos-7","organizationName":"Mi empresa"}'
 curl -b cookies.txt -X POST localhost:3000/assessments -H "content-type: application/json" \
   -d '{"frameworkId":"iso27001-2022"}'
 curl -b cookies.txt localhost:3000/auth/me

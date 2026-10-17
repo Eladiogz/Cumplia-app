@@ -37,14 +37,19 @@ export async function protectedRoutes(app: FastifyInstance, { db, resolveTenant,
         .code(403)
         .send({ error: "Tu organización exige MFA: activalo para continuar", code: "MFA_SETUP_REQUIRED" });
     }
-    const permission = req.routeOptions.config.permission;
+    const { permission, verifiedEmail } = req.routeOptions.config;
     if (!permission || !can(tenant.role, permission)) {
       return reply.code(403).send({ error: "No tenés permiso para esta acción", code: "FORBIDDEN" });
+    }
+    if (verifiedEmail && !tenant.emailVerified) {
+      return reply
+        .code(403)
+        .send({ error: "Confirmá tu email para hacer esto (revisá tu casilla o pedí un nuevo link)", code: "EMAIL_NOT_VERIFIED" });
     }
     req.tenant = tenant;
   });
 
   app.register(assessmentRoutes, { db });
-  app.register(organizationRoutes, { db });
+  app.register(organizationRoutes, { db, mailer, appUrl });
   app.register(invitationRoutes, { db, mailer, appUrl });
 }

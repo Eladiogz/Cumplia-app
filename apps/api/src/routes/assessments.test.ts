@@ -13,7 +13,7 @@ let orgB: string;
 const testResolver: TenantResolver = (req) => {
   const id = req.headers["x-org"];
   return typeof id === "string"
-    ? { organizationId: id, actorId: null, role: "ADMIN", mfaEnabled: false, mfaSetupRequired: false }
+    ? { organizationId: id, actorId: null, role: "ADMIN", mfaEnabled: false, mfaSetupRequired: false, emailVerified: true }
     : null;
 };
 

@@ -14,6 +14,7 @@ export interface Me {
   role: Role;
   mfaEnabled: boolean;
   mfaSetupRequired: boolean;
+  emailVerified: boolean;
 }
 
 export interface OrganizationMembership {

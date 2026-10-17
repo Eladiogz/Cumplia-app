@@ -1,12 +1,13 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { forOrganization, getUserById, type Db } from "@cumplia/db";
+import { ACCEPT_INVITATION_PATH, appLink } from "../email/links.js";
 import type { Mailer } from "../email/mailer.js";
 import { invitationEmail } from "../email/templates.js";
 import { requires } from "../security/permissions.js";
 import { hashToken, newSessionToken } from "../security/session.js";
 import { RoleSchema } from "../tenant.js";
-import { Email } from "./auth.js";
+import { Email } from "./schemas.js";
 
 export const INVITATION_DAYS = 7;
 
@@ -20,9 +21,6 @@ interface Options {
   appUrl: string;
 }
 
-/** Link de aceptación. El token va en el fragmento (#): el navegador no lo envía a ningún servidor ni en el Referer. */
-export const acceptUrl = (appUrl: string, token: string) =>
-  `${appUrl.replace(/\/$/, "")}/invitaciones/aceptar#token=${encodeURIComponent(token)}`;
 
 /** Gestión de invitaciones de la organización activa (dentro de protectedRoutes). */
 export async function invitationRoutes(app: FastifyInstance, { db, mailer, appUrl }: Options) {
@@ -37,7 +35,7 @@ export async function invitationRoutes(app: FastifyInstance, { db, mailer, appUr
    * esa casilla (ni siquiera el ADMIN que invita lo ve). Si el email no sale, la
    * invitación se revoca para no dejar un link que nadie recibió.
    */
-  app.post("/invitations", requires("members:manage"), async (req, reply) => {
+  app.post("/invitations", requires("members:manage", { verifiedEmail: true }), async (req, reply) => {
     const { email, role } = InvitationBody.parse(req.body);
     const r = repo(req);
     const token = newSessionToken();
@@ -58,7 +56,7 @@ export async function invitationRoutes(app: FastifyInstance, { db, mailer, appUr
           organizationName: organization.name,
           invitedBy: inviter?.name ?? inviter?.email ?? "Un administrador",
           role,
-          url: acceptUrl(appUrl, token),
+          url: appLink(appUrl, ACCEPT_INVITATION_PATH, token),
           expiresAt: invitation.expiresAt,
         }),
       );

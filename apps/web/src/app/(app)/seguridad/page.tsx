@@ -2,24 +2,107 @@
 
 import { useState, type FormEvent } from "react";
 import QRCode from "qrcode";
-import { ShieldCheck, ShieldOff } from "lucide-react";
-import { Field, FormError } from "@/components/form";
+import { KeyRound, ShieldCheck, ShieldOff } from "lucide-react";
+import { Field, FormError, FormSuccess } from "@/components/form";
 import { PageHeader } from "@/components/page-header";
+import { NewPasswordField } from "@/components/password-field";
 import { RecoveryCodes } from "@/components/recovery-codes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { api, errorMessage } from "@/lib/api";
+import { passwordProblem } from "@/lib/password";
 import { useMe } from "@/lib/session";
 
 export default function SecurityPage() {
   const { me } = useMe();
   return (
     <>
-      <PageHeader title="Seguridad" description="Protegé tu cuenta con la verificación en dos pasos (MFA)." />
-      <div className="grid gap-4">{me.mfaEnabled ? <MfaEnabled /> : <MfaSetup />}</div>
+      <PageHeader title="Seguridad" description="Tu contraseña y la verificación en dos pasos (MFA)." />
+      <div className="grid gap-4">
+        {me.mfaEnabled ? <MfaEnabled /> : <MfaSetup />}
+        {!me.mfaSetupRequired && <ChangePassword />}
+      </div>
     </>
+  );
+}
+
+function ChangePassword() {
+  const { me, organizations } = useMe();
+  const [current, setCurrent] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const context = {
+    email: me.user.email,
+    name: me.user.name,
+    organizationName: organizations.map((o) => o.organizationName).join(" "),
+  };
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setSuccess(null);
+    const problem = passwordProblem(password, confirm, context);
+    if (problem) return setError(problem);
+    setError(null);
+    setPending(true);
+    try {
+      await api("/auth/password", { body: { currentPassword: current, newPassword: password } });
+      setSuccess("Listo: cambiaste tu contraseña y cerramos tus otras sesiones.");
+      setCurrent("");
+      setPassword("");
+      setConfirm("");
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <KeyRound className="size-4 text-primary" aria-hidden /> Contraseña
+        </CardTitle>
+        <CardDescription>Al cambiarla cerramos tus sesiones en otros dispositivos.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={submit} className="grid max-w-md gap-4">
+          <FormError message={error} />
+          <FormSuccess message={success} />
+          <Field id="current-password" label="Contraseña actual">
+            <Input
+              id="current-password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={current}
+              onChange={(e) => setCurrent(e.target.value)}
+            />
+          </Field>
+          <NewPasswordField id="new-password" label="Contraseña nueva" value={password} onChange={setPassword} context={context} />
+          <Field id="confirm-password" label="Repetí la contraseña nueva">
+            <Input
+              id="confirm-password"
+              type="password"
+              autoComplete="new-password"
+              required
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+            />
+          </Field>
+          <div>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Guardando…" : "Cambiar contraseña"}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 

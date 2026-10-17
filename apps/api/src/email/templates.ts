@@ -74,6 +74,45 @@ export const recoveryCodeUsedEmail = (to: string, remaining: number) =>
     SECURITY_FOOTER,
   ]);
 
+export const verifyEmailEmail = (to: string, url: string) =>
+  message(
+    to,
+    "Confirmá tu email en Cumplia",
+    [
+      "Para terminar de activar tu cuenta de Cumplia, confirmá que este email es tuyo.",
+      "El link vence en 24 horas. Si no creaste una cuenta, ignorá este mensaje.",
+    ],
+    { label: "Confirmar mi email", url },
+  );
+
+export function passwordResetEmail(input: { to: string; url: string; minutes: number; requestedByOrganization?: string }) {
+  return message(
+    input.to,
+    "Restablecé tu contraseña de Cumplia",
+    [
+      input.requestedByOrganization
+        ? `Un administrador de ${input.requestedByOrganization} pidió que restablezcas tu contraseña de Cumplia.`
+        : "Recibimos un pedido para restablecer la contraseña de tu cuenta de Cumplia.",
+      `El link vence en ${input.minutes} minutos y sirve una sola vez. Tu contraseña actual sigue funcionando hasta que elijas una nueva.`,
+      "Si no lo pediste, ignorá este email: nadie puede cambiar tu contraseña sin este link.",
+    ],
+    { label: "Elegir una contraseña nueva", url: input.url },
+  );
+}
+
+export const passwordChangedEmail = (to: string) =>
+  message(to, "Tu contraseña cambió", [
+    "La contraseña de tu cuenta de Cumplia se cambió y cerramos las otras sesiones abiertas.",
+    "Si no fuiste vos, restablecela ahora desde «¿Olvidaste tu contraseña?» y avisale al administrador de tu organización.",
+  ]);
+
+export const mfaResetByAdminEmail = (to: string, organizationName: string) =>
+  message(to, "Un administrador restableció tu verificación en dos pasos", [
+    `Un administrador de ${organizationName} restableció la verificación en dos pasos (MFA) de tu cuenta y cerró tus sesiones.`,
+    "La próxima vez que ingreses vas a poder (o tener que) configurarla de nuevo con tu app de autenticación.",
+    SECURITY_FOOTER,
+  ]);
+
 export const accountLockedEmail = (to: string, minutes: number) =>
   message(to, "Bloqueamos tu cuenta temporalmente", [
     `Hubo varios intentos fallidos de iniciar sesión en tu cuenta de Cumplia, así que la bloqueamos por ${minutes} minutos.`,

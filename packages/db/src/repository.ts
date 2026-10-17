@@ -10,7 +10,9 @@ import {
   evidence,
   invitations,
   memberships,
+  mfaChallenges,
   organizations,
+  sessions,
   users,
   type AuditDetails,
 } from "./schema.js";
@@ -264,6 +266,37 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
         .innerJoin(users, eq(users.id, memberships.userId))
         .where(eq(memberships.organizationId, organizationId))
         .orderBy(asc(users.email));
+    },
+
+    /** Un miembro de ESTA organización (si no lo es, NotFound: no se revela si la cuenta existe). */
+    async getMember(userId: string) {
+      const [member] = await db
+        .select({
+          userId: users.id,
+          email: users.email,
+          name: users.name,
+          role: memberships.role,
+          mfaEnabled: sql<boolean>`${users.mfaEnabledAt} is not null`,
+        })
+        .from(memberships)
+        .innerJoin(users, eq(users.id, memberships.userId))
+        .where(and(eq(memberships.organizationId, organizationId), eq(memberships.userId, userId)));
+      if (!member) throw new NotFoundError("Miembro");
+      return member;
+    },
+
+    /** Cierra las sesiones del miembro SOLO en esta organización (las de otras no son asunto suyo). */
+    async revokeMemberSessions(userId: string) {
+      await inTenant(async (tx) => {
+        const closed = await tx
+          .delete(sessions)
+          .where(and(eq(sessions.userId, userId), eq(sessions.organizationId, organizationId)))
+          .returning({ id: sessions.id });
+        await tx
+          .delete(mfaChallenges)
+          .where(and(eq(mfaChallenges.userId, userId), eq(mfaChallenges.organizationId, organizationId)));
+        await audit(tx, "member.sessions_revoked", "user", userId, { sessions: closed.length });
+      });
     },
 
     /** Cambia el rol. Nunca deja a la organización sin ADMIN. */

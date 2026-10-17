@@ -10,7 +10,7 @@ let ctx: Awaited<ReturnType<typeof createTestDb>>;
 let app: ReturnType<typeof buildApp>;
 
 const ORIGIN = "http://localhost:3001";
-const PASSWORD = "clave-segura-de-prueba";
+const PASSWORD = "Clave-Segura-de-Prueba-2026";
 
 beforeAll(async () => {
   ctx = await createTestDb();

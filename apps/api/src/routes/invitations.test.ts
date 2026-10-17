@@ -13,7 +13,7 @@ let ctx: Awaited<ReturnType<typeof createTestDb>>;
 let app: ReturnType<typeof buildApp>;
 const mailer = new MemoryMailer();
 
-const PASSWORD = "clave-segura-de-prueba";
+const PASSWORD = "Clave-Segura-de-Prueba-2026";
 const APP_URL = "https://app.cumplia.test";
 
 beforeAll(async () => {
@@ -49,6 +49,8 @@ const registerAdmin = async (organizationName = "Empresa") => {
   const email = uniqueEmail();
   const res = await call("POST", "/auth/register", undefined, { email, password: PASSWORD, organizationName });
   const body = res.json() as { user: { id: string }; organization: { id: string } };
+  // Invitar exige email verificado (el flujo de verificación se prueba en account-security.test.ts).
+  await ctx.db.update(schema.users).set({ emailVerifiedAt: new Date() }).where(eq(schema.users.id, body.user.id));
   return { email, userId: body.user.id, orgId: body.organization.id, cookie: cookieOf(res)! };
 };
 
@@ -212,7 +214,7 @@ describe("aceptar una invitación", () => {
     const admin = await registerAdmin();
     const other = await registerAdmin("Su propia empresa");
     const inv = await invite(admin.cookie, other.email);
-    const res = await call("POST", "/auth/invitations/accept", undefined, { token: inv.token, password: "otra-clave-de-intruso" });
+    const res = await call("POST", "/auth/invitations/accept", undefined, { token: inv.token, password: "Otra-Clave-de-Intruso-9" });
     expect(res.statusCode).toBe(409);
     expect((await call("POST", "/auth/login", undefined, { email: other.email, password: PASSWORD })).statusCode).toBe(200);
     expect(await pendingIds(admin.cookie)).toEqual([inv.id]);
