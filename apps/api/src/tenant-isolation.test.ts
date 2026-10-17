@@ -34,6 +34,7 @@ const PARAMS: Record<string, () => string> = {
 /** Cuerpos válidos: así la petición llega hasta la verificación de pertenencia (y no muere en un 400). */
 const BODIES: Record<string, object> = {
   "PUT /assessments/:id/answers": { answers: [{ controlId: "A.5.1", applicable: true, maturity: 4 }] },
+  "PATCH /assessments/:id": { name: "Renombrada por otra organización" },
   "POST /assessments/:id/evidence": { controlId: "A.5.1", source: "manual", description: "intrusa" },
   "PATCH /members/:userId": { role: "AUDITOR" },
   "POST /members/:userId/password-reset": {},

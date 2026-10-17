@@ -150,10 +150,15 @@ export const assessments = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     organizationId: uuid("organization_id").notNull().references(() => organizations.id),
     frameworkId: text("framework_id").notNull(),
+    // El valor por defecto también rellena las filas existentes al migrar (sin UPDATE: RLS no interviene).
+    name: text("name").notNull().default("Evaluación ISO/IEC 27001:2022"),
     targetMaturity: integer("target_maturity").notNull().default(3),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // Última respuesta, evidencia o cambio de datos (para ordenar y mostrar actividad).
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    check("assessments_name_length", sql`char_length(${t.name}) between 1 and 120`),
     // Destino de las FK compuestas (id, organization_id) de las tablas hijas.
     unique("assessments_id_org_uq").on(t.id, t.organizationId),
     index("assessments_org_idx").on(t.organizationId),

@@ -6,10 +6,25 @@ import { NotFoundError, forOrganization, type Db } from "@cumplia/db";
 import { requires } from "../security/permissions.js";
 
 const IdParams = z.object({ id: z.string().uuid() });
+const Name = z.string().trim().min(1).max(120);
+const Target = z.number().int().min(1).max(4);
 const CreateBody = z.object({
   frameworkId: z.string().min(1),
-  targetMaturity: z.number().int().min(1).max(4).default(3),
+  name: Name.optional(),
+  targetMaturity: Target.default(3),
 });
+const UpdateBody = z
+  .object({ name: Name.optional(), targetMaturity: Target.optional() })
+  .refine((b) => b.name !== undefined || b.targetMaturity !== undefined, { message: "Nada para actualizar" });
+
+/** Cantidad de controles del marco (para mostrar el avance). */
+const controlCount = (frameworkId: string) => {
+  try {
+    return loadFramework(frameworkId).controls.length;
+  } catch {
+    return 0;
+  }
+};
 const AnswersBody = z.object({ answers: z.array(AnswerSchema).max(500) });
 const EvidenceBody = z.object({
   controlId: z.string().min(1),
@@ -33,11 +48,24 @@ export async function assessmentRoutes(app: FastifyInstance, opts: Options) {
 
   app.post("/assessments", WRITE, async (req, reply) => {
     const body = CreateBody.parse(req.body);
-    const created = await repo(req).createAssessment(body.frameworkId, body.targetMaturity);
+    const created = await repo(req).createAssessment(body.frameworkId, body.targetMaturity, body.name);
     return reply.code(201).send(created);
   });
 
-  app.get("/assessments", READ, async (req) => repo(req).listAssessments());
+  app.get("/assessments", READ, async (req) => {
+    const list = await repo(req).listAssessments();
+    return list.map((a) => ({ ...a, total: controlCount(a.frameworkId) }));
+  });
+
+  app.patch("/assessments/:id", WRITE, async (req) => {
+    const { id } = IdParams.parse(req.params);
+    return repo(req).updateAssessment(id, UpdateBody.parse(req.body));
+  });
+
+  app.get("/assessments/:id/evidence", READ, async (req) => {
+    const { id } = IdParams.parse(req.params);
+    return repo(req).listEvidence(id);
+  });
 
   app.get("/assessments/:id", READ, async (req) => {
     const { id } = IdParams.parse(req.params);
