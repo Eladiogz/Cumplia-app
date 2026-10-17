@@ -24,7 +24,7 @@ Pendientes menores para más adelante: cola de emails con reintentos (outbox), l
 
 ## Fase 3 — Aplicación web
 - Base Next.js (apps/web), proxy /api, acceso completo: ingreso, registro, MFA, invitaciones, organización y seguridad (hecho)
-- Asistente de gap assessment (respuestas por control, justificación, evidencia)
+- Asistente de gap assessment (respuestas por control, justificación, evidencia) (hecho)
 - Tablero de madurez (puntaje por dominio, brechas priorizadas)
 - Exportación de la SoA (PDF/Excel)
 - Registro de riesgos (API + web)

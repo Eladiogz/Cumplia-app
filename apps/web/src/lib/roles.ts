@@ -16,3 +16,4 @@ export const ROLE_DESCRIPTION: Record<Role, string> = {
 // La API es la que decide: esconder un botón no es seguridad.
 export const canManageMembers = (role: Role) => role === "ADMIN";
 export const canSeeMembers = (role: Role) => role === "ADMIN" || role === "AUDITOR";
+export const canEditAssessments = (role: Role) => role === "ADMIN" || role === "CONSULTANT";

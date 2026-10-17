@@ -4,7 +4,7 @@
 
 ## Estado: Fases 1, 2A y 2B completas · Fase 3 (aplicación web) en curso
 - Monorepo TypeScript (pnpm): `apps/api`, `apps/web`, `packages/frameworks`, `packages/core`, `packages/db`
-- `apps/web`: Next.js + Tailwind + componentes estilo shadcn/ui. Por ahora: ingreso, registro, verificación en dos pasos, aceptar invitaciones, selector de organización, seguridad (MFA) y organización (miembros, invitaciones, MFA obligatorio)
+- `apps/web`: Next.js + Tailwind + componentes estilo shadcn/ui. Ingreso, registro, verificación en dos pasos, recuperación de contraseña, invitaciones, selector de organización, seguridad, organización y el **asistente de evaluación**: los 93 controles por dominio, aplica/no aplica (con justificación obligatoria), madurez 0-4 con descripción de cada nivel, notas, evidencia, avance por dominio y guardado automático (ADMIN y CONSULTANT editan; AUDITOR ve en modo lectura)
 - Los 93 controles del Anexo A de ISO/IEC 27001:2022 como datos versionados
 - Motor de puntaje de madurez (escala 0-4), brechas priorizadas y Declaración de Aplicabilidad (SoA)
 - API Fastify con helmet y rate limit
@@ -65,8 +65,10 @@ Rutas por organización (requieren sesión; sin ella responden 401, sin el rol n
 
 | Método | Ruta | Descripción | Roles |
 |---|---|---|---|
-| GET | `/assessments` · `/assessments/:id` | Listar y ver evaluaciones | todos |
-| POST | `/assessments` | Crear evaluación | ADMIN, CONSULTANT |
+| GET | `/assessments` · `/assessments/:id` | Listar (con avance `answered`/`total`) y ver evaluaciones | todos |
+| POST | `/assessments` | Crear evaluación (`name` opcional, `targetMaturity` 1-4) | ADMIN, CONSULTANT |
+| PATCH | `/assessments/:id` | Cambiar nombre u objetivo de madurez | ADMIN, CONSULTANT |
+| GET | `/assessments/:id/evidence` | Evidencia registrada, con su control | todos |
 | GET · PUT | `/assessments/:id/answers` | Leer (todos) y guardar (ADMIN, CONSULTANT) respuestas | — |
 | GET | `/assessments/:id/result` · `/soa` | Puntaje y Declaración de Aplicabilidad | todos |
 | POST | `/assessments/:id/evidence` | Registrar evidencia de un control | ADMIN, CONSULTANT |

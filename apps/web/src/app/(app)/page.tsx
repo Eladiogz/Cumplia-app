@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowRight, ClipboardList, ShieldAlert, ShieldCheck, Users } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
@@ -46,9 +45,11 @@ export default function HomePage() {
                   ? "Todavía no hay evaluaciones en esta organización."
                   : `${assessments.length} evaluación${assessments.length === 1 ? "" : "es"} en curso.`}
             </p>
-            <Badge variant="secondary" className="w-fit">
-              El asistente de evaluación llega en la próxima versión
-            </Badge>
+            <Button asChild variant={assessments?.length ? "outline" : "default"} size="sm" className="w-fit">
+              <Link href="/evaluaciones">
+                {assessments?.length ? "Ver evaluaciones" : "Empezar una evaluación"} <ArrowRight aria-hidden />
+              </Link>
+            </Button>
           </CardContent>
         </Card>
 

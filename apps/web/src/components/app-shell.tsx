@@ -6,7 +6,6 @@ import { useState, type ReactNode } from "react";
 import { Building2, Check, ChevronsUpDown, ClipboardList, Home, LogOut, MailWarning, ShieldCheck, ShieldAlert } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,7 +22,7 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/", label: "Inicio", icon: Home },
-  { href: "/evaluaciones", label: "Evaluaciones", icon: ClipboardList, soon: true },
+  { href: "/evaluaciones", label: "Evaluaciones", icon: ClipboardList },
   { href: "/organizacion", label: "Organización", icon: Building2 },
   { href: "/seguridad", label: "Seguridad", icon: ShieldCheck },
 ] as const;
@@ -103,11 +102,10 @@ function Nav({ className }: { className?: string }) {
   const { me } = useMe();
   return (
     <nav className={cn("flex gap-1", className)} aria-label="Principal">
-      {NAV.map(({ href, label, icon: Icon, ...item }) => {
-        const soon = "soon" in item && item.soon;
+      {NAV.map(({ href, label, icon: Icon }) => {
         const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
         // Mientras falte activar MFA exigido, solo se puede ir a Seguridad.
-        const blocked = soon || (me.mfaSetupRequired && href !== "/seguridad");
+        const blocked = me.mfaSetupRequired && href !== "/seguridad";
         if (blocked) {
           return (
             <span
@@ -117,7 +115,6 @@ function Nav({ className }: { className?: string }) {
             >
               <Icon className="size-4" aria-hidden />
               {label}
-              {soon && <Badge variant="secondary">Pronto</Badge>}
             </span>
           );
         }
