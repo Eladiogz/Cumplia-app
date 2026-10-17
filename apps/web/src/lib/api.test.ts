@@ -35,6 +35,18 @@ describe("cliente de la API", () => {
     expect(init.body).toBe('{"email":"a@b.com"}');
   });
 
+  it("manda FormData tal cual, sin content-type (lo arma el navegador con el separador)", async () => {
+    const fetchMock = respond(201, { id: "x" });
+    vi.stubGlobal("fetch", fetchMock);
+    const form = new FormData();
+    form.append("controlId", "A.5.1");
+    await api("/assessments/1/evidence/files", { body: form });
+    const init = fetchMock.mock.lastCall?.[1];
+    expect(init.method).toBe("POST");
+    expect(init.headers).toBeUndefined();
+    expect(init.body).toBe(form);
+  });
+
   it("devuelve undefined en 204", async () => {
     vi.stubGlobal("fetch", respond(204));
     expect(await api("/auth/logout", { method: "POST" })).toBeUndefined();

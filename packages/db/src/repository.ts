@@ -54,6 +54,28 @@ export async function createOrganization(db: Db, name: string) {
 
 export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
+/** Archivo de una evidencia, ya guardado en el almacenamiento por la API. */
+export interface EvidenceFile {
+  id: string;
+  key: string;
+  name: string;
+  size: number;
+  contentType: string;
+  sha256: string;
+}
+
+/** Columnas de una evidencia que se pueden mostrar: nunca la clave interna del archivo. */
+const evidencePublicColumns = {
+  id: evidence.id,
+  source: evidence.source,
+  description: evidence.description,
+  fileName: evidence.fileName,
+  fileSize: evidence.fileSize,
+  contentType: evidence.contentType,
+  sha256: evidence.sha256,
+  collectedAt: evidence.collectedAt,
+};
+
 /** Ni aceptada ni revocada (el vencimiento se controla aparte). */
 export const pending = and(isNull(invitations.acceptedAt), isNull(invitations.revokedAt));
 
@@ -182,17 +204,55 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
       return inTenant(async (tx) => {
         if (!(await ownedAssessment(tx, assessmentId))) throw new NotFoundError("Evaluación");
         return tx
-          .select({
-            id: evidence.id,
-            controlId: controlAnswers.controlId,
-            source: evidence.source,
-            description: evidence.description,
-            collectedAt: evidence.collectedAt,
-          })
+          .select({ ...evidencePublicColumns, controlId: controlAnswers.controlId })
           .from(evidence)
           .innerJoin(controlAnswers, eq(controlAnswers.id, evidence.controlAnswerId))
           .where(and(eq(controlAnswers.assessmentId, assessmentId), eq(evidence.organizationId, organizationId)))
           .orderBy(asc(evidence.collectedAt));
+      });
+    },
+
+    /** Datos para descargar el archivo de una evidencia de ESTA organización y evaluación. */
+    async getEvidenceFile(assessmentId: string, evidenceId: string) {
+      return inTenant(async (tx) => {
+        const [row] = await tx
+          .select({ fileKey: evidence.fileKey, fileName: evidence.fileName, contentType: evidence.contentType })
+          .from(evidence)
+          .innerJoin(controlAnswers, eq(controlAnswers.id, evidence.controlAnswerId))
+          .where(
+            and(
+              eq(evidence.id, evidenceId),
+              eq(evidence.organizationId, organizationId),
+              eq(controlAnswers.assessmentId, assessmentId),
+            ),
+          );
+        if (!row?.fileKey || !row.fileName || !row.contentType) throw new NotFoundError("Archivo");
+        return { fileKey: row.fileKey, fileName: row.fileName, contentType: row.contentType };
+      });
+    },
+
+    /** Borra una evidencia (queda en la auditoría). Devuelve la clave del archivo para borrarlo del almacenamiento. */
+    async deleteEvidence(assessmentId: string, evidenceId: string) {
+      return inTenant(async (tx) => {
+        const [row] = await tx
+          .select({ id: evidence.id, fileKey: evidence.fileKey, fileName: evidence.fileName, sha256: evidence.sha256, controlId: controlAnswers.controlId })
+          .from(evidence)
+          .innerJoin(controlAnswers, eq(controlAnswers.id, evidence.controlAnswerId))
+          .where(
+            and(
+              eq(evidence.id, evidenceId),
+              eq(evidence.organizationId, organizationId),
+              eq(controlAnswers.assessmentId, assessmentId),
+            ),
+          );
+        if (!row) throw new NotFoundError("Evidencia");
+        await tx.delete(evidence).where(and(eq(evidence.id, evidenceId), eq(evidence.organizationId, organizationId)));
+        await touch(tx, assessmentId);
+        await audit(tx, "evidence.delete", "evidence", evidenceId, {
+          controlId: row.controlId,
+          ...(row.fileName ? { fileName: row.fileName, sha256: row.sha256 } : {}),
+        });
+        return { fileKey: row.fileKey };
       });
     },
 
@@ -248,7 +308,7 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
       });
     },
 
-    async addEvidence(assessmentId: string, controlId: string, source: string, description: string) {
+    async addEvidence(assessmentId: string, controlId: string, source: string, description: string, file?: EvidenceFile) {
       return inTenant(async (tx) => {
         const [answer] = await tx
           .select()
@@ -263,11 +323,29 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
         if (!answer) throw new NotFoundError("Respuesta de control");
         const [ev] = await tx
           .insert(evidence)
-          .values({ organizationId, controlAnswerId: answer.id, source, description })
-          .returning();
+          .values({
+            organizationId,
+            controlAnswerId: answer.id,
+            source,
+            description,
+            ...(file
+              ? {
+                  id: file.id,
+                  fileKey: file.key,
+                  fileName: file.name,
+                  fileSize: file.size,
+                  contentType: file.contentType,
+                  sha256: file.sha256,
+                }
+              : {}),
+          })
+          .returning(evidencePublicColumns);
         if (!ev) throw new Error("No se pudo guardar la evidencia");
         await touch(tx, assessmentId);
-        await audit(tx, "evidence.add", "evidence", ev.id, { controlId });
+        await audit(tx, "evidence.add", "evidence", ev.id, {
+          controlId,
+          ...(file ? { fileName: file.name, sha256: file.sha256 } : {}),
+        });
         return { ...ev, controlId };
       });
     },

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { Db } from "@cumplia/db";
 import type { Mailer } from "./email/mailer.js";
+import type { ObjectStorage } from "./storage/storage.js";
 import { assessmentRoutes } from "./routes/assessments.js";
 import { invitationRoutes } from "./routes/invitations.js";
 import { organizationRoutes } from "./routes/organization.js";
@@ -12,6 +13,7 @@ interface Options {
   resolveTenant: TenantResolver;
   mailer: Mailer;
   appUrl: string;
+  storage?: ObjectStorage;
 }
 
 /**
@@ -19,7 +21,7 @@ interface Options {
  * sin tenant → 401; organización que exige MFA y usuario sin MFA → 403;
  * rol sin el permiso que declara la ruta → 403.
  */
-export async function protectedRoutes(app: FastifyInstance, { db, resolveTenant, mailer, appUrl }: Options) {
+export async function protectedRoutes(app: FastifyInstance, { db, resolveTenant, mailer, appUrl, storage }: Options) {
   app.decorateRequest("tenant", null);
 
   // Una ruta sin permiso declarado no llega a existir: la app no arranca.
@@ -49,7 +51,7 @@ export async function protectedRoutes(app: FastifyInstance, { db, resolveTenant,
     req.tenant = tenant;
   });
 
-  app.register(assessmentRoutes, { db });
+  app.register(assessmentRoutes, { db, storage });
   app.register(organizationRoutes, { db, mailer, appUrl });
   app.register(invitationRoutes, { db, mailer, appUrl });
 }

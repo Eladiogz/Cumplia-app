@@ -20,5 +20,17 @@ services:
       - "8025:8025"
       - "1025:1025"
 
+  # Solo desarrollo: almacenamiento compatible con S3 para los archivos de evidencia.
+  # S3 en http://localhost:8333 (credenciales de docker/seaweedfs/s3.json).
+  files:
+    image: chrislusf/seaweedfs:4.48
+    command: server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+    ports:
+      - "8333:8333"
+    volumes:
+      - files_data:/data
+      - ./docker/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+
 volumes:
   db_data:
+  files_data:

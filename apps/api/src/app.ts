@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import cookie from "@fastify/cookie";
+import multipart from "@fastify/multipart";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import { ZodError, z } from "zod";
@@ -13,6 +14,8 @@ import { mfaRoutes } from "./routes/mfa.js";
 import { passwordRoutes } from "./routes/password.js";
 import { protectedRoutes } from "./protected.js";
 import { WeakPasswordError } from "./security/password-policy.js";
+import { MAX_EVIDENCE_BYTES } from "./storage/files.js";
+import type { ObjectStorage } from "./storage/storage.js";
 import { MFA_CHALLENGE_PATH } from "./security/session.js";
 import type { TenantResolver } from "./tenant.js";
 
@@ -48,6 +51,8 @@ export interface AppOptions {
   trustProxy?: boolean | string;
   /** Prefijo con el que el navegador ve la API (p. ej. "/api" detrás del proxy de la web). */
   publicPathPrefix?: string;
+  /** Almacenamiento de archivos de evidencia (S3). Sin él, la carga de archivos responde 503. */
+  storage?: ObjectStorage;
 }
 
 export function buildApp({
@@ -61,6 +66,7 @@ export function buildApp({
   appUrl = allowedOrigins[0] ?? "http://localhost:3001",
   trustProxy = false,
   publicPathPrefix = "",
+  storage,
 }: AppOptions = {}) {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test", trustProxy });
   const mailer = givenMailer ?? createLogMailer(app.log);
@@ -69,6 +75,8 @@ export function buildApp({
 
   app.register(helmet);
   app.register(cookie);
+  // Solo lee el archivo cuando la ruta lo pide (req.file()), después de verificar sesión y permisos.
+  app.register(multipart, { limits: { fileSize: MAX_EVIDENCE_BYTES, files: 1 } });
   app.register(rateLimit, { max: 100, timeWindow: "1 minute" });
 
   // Defensa CSRF adicional a SameSite: un navegador siempre envía Origin en peticiones
@@ -137,7 +145,7 @@ export function buildApp({
     if (mfaEncryptionKey) {
       app.register(mfaRoutes, { db, secureCookies, authRateLimit, encryptionKey: mfaEncryptionKey, mailer, mfaCookiePath });
     }
-    app.register(protectedRoutes, { db, resolveTenant, mailer, appUrl });
+    app.register(protectedRoutes, { db, resolveTenant, mailer, appUrl, storage });
   }
 
   return app;

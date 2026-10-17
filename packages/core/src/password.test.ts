@@ -16,7 +16,8 @@ describe("política de contraseñas", () => {
     expect(checkPassword("solo-minusculas-123")).toContain("uppercase");
     expect(checkPassword("Sin-Numeros-Ninguno")).toContain("digit");
     expect(checkPassword("SinSimbolosNinguno12")).toContain("symbol");
-    expect(checkPassword("x".repeat(129))).toContain("length");
+    expect(checkPassword("Abc-1".repeat(26))).toEqual(["tooLong"]);
+    expect(checkPassword("Una frase larga de 40 caracteres o más!")).toEqual([]);
   });
 
   it("cuenta caracteres, no bytes, y reconoce letras con tilde y ñ", () => {

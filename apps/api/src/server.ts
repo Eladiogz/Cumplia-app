@@ -1,6 +1,7 @@
 import { createDb, rowLevelSecurityBypassReasons } from "@cumplia/db";
 import { buildApp } from "./app.js";
 import { createSmtpMailer } from "./email/mailer.js";
+import { createS3Storage } from "./storage/storage.js";
 import { parseEncryptionKey } from "./security/encryption.js";
 import { createDevTenantResolver, createSessionTenantResolver, firstOf } from "./tenant.js";
 
@@ -30,6 +31,28 @@ if (isProd && !smtpUrl) throw new Error("Falta SMTP_URL: en producción los emai
 const mailer = smtpUrl ? createSmtpMailer(smtpUrl, process.env.MAIL_FROM ?? "Cumplia <no-reply@cumplia.local>") : undefined;
 if (!mailer) console.warn("ADVERTENCIA: sin SMTP_URL, los emails (con sus links) se escriben en el log.");
 
+// Archivos de evidencia en un almacenamiento S3 (AWS, R2, Backblaze; SeaweedFS en desarrollo).
+const s3Bucket = process.env.S3_BUCKET;
+if (isProd && !s3Bucket) throw new Error("Falta S3_BUCKET: en producción la evidencia con archivos necesita almacenamiento");
+let storage: ReturnType<typeof createS3Storage> | undefined;
+if (s3Bucket) {
+  const { S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY } = process.env;
+  if (!S3_ACCESS_KEY_ID || !S3_SECRET_ACCESS_KEY) throw new Error("Faltan S3_ACCESS_KEY_ID y S3_SECRET_ACCESS_KEY");
+  storage = createS3Storage({
+    bucket: s3Bucket,
+    region: process.env.S3_REGION ?? "us-east-1",
+    endpoint: process.env.S3_ENDPOINT || undefined,
+    forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "true",
+    accessKeyId: S3_ACCESS_KEY_ID,
+    secretAccessKey: S3_SECRET_ACCESS_KEY,
+    serverSideEncryption: process.env.S3_SSE === "AES256" ? "AES256" : undefined,
+  });
+  // En desarrollo se crea el bucket si falta; en producción tiene que existir.
+  await storage.ensureBucket(!isProd);
+} else {
+  console.warn("ADVERTENCIA: sin S3_BUCKET, la carga de archivos de evidencia está deshabilitada.");
+}
+
 // El resolver de desarrollo jamás se activa en producción.
 const devTenant = process.env.ALLOW_DEV_TENANT_HEADER === "true" && !isProd;
 const session = createSessionTenantResolver(db);
@@ -51,6 +74,7 @@ const app = buildApp({
   allowedOrigins,
   mailer,
   appUrl: process.env.APP_URL ?? allowedOrigins[0],
+  storage,
 });
 app.addHook("onClose", async () => {
   await pool.end();

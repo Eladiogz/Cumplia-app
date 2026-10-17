@@ -1,0 +1,9 @@
+{
+  "identities": [
+    {
+      "name": "cumplia-dev",
+      "credentials": [{ "accessKey": "cumplia", "secretKey": "cumplia-dev-secret" }],
+      "actions": ["Admin", "Read", "List", "Tagging", "Write"]
+    }
+  ]
+}

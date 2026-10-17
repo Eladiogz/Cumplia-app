@@ -197,8 +197,16 @@ export const evidence = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     organizationId: uuid("organization_id").notNull().references(() => organizations.id),
     controlAnswerId: uuid("control_answer_id").notNull(),
-    source: text("source").notNull(), // manual, m365, github...
+    source: text("source").notNull(), // manual, archivo, m365, github...
     description: text("description").notNull(),
+    // Archivo adjunto (opcional). La clave en el almacenamiento la arma la API
+    // (org/<organización>/...); el nombre es el que se muestra al descargar.
+    fileKey: text("file_key"),
+    fileName: text("file_name"),
+    fileSize: integer("file_size"),
+    contentType: text("content_type"),
+    // Huella SHA-256: demuestra ante un auditor que el archivo no cambió desde que se cargó.
+    sha256: text("sha256"),
     collectedAt: timestamp("collected_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

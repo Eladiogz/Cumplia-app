@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, ArrowLeft, Check, ChevronDown, CircleDashed, FileText, Loader2, Pencil, SkipForward } from "lucide-react";
 import { MATURITY_LEVELS } from "@cumplia/core/maturity";
+import { EvidenceSection } from "@/components/evidence-section";
 import { Field, FormError, Spinner } from "@/components/form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -61,15 +62,19 @@ export default function AssessmentWizardPage() {
   }, [id]);
 
   // ---- Guardado automático: una fila por control, para que nunca gane una respuesta vieja ----
-  const queues = useRef(new Map<string, Promise<void>>());
+  const queues = useRef(new Map<string, Promise<boolean>>());
   const timers = useRef(new Map<string, { timer: ReturnType<typeof setTimeout>; answer: Answer }>());
+  // Copia sincrónica de `stored` para decidir sin esperar a un re-render.
+  const storedRef = useRef(stored);
+  storedRef.current = stored;
 
+  /** Guarda la respuesta (en fila por control). Devuelve si quedó guardada. */
   const persist = useCallback(
-    (answer: Answer) => {
+    (answer: Answer): Promise<boolean> => {
       const controlId = answer.controlId;
       if (answerProblem(answer)) {
         setSaveState((s) => ({ ...s, [controlId]: "invalid" }));
-        return;
+        return Promise.resolve(false);
       }
       setSaveState((s) => ({ ...s, [controlId]: "saving" }));
       const body: Answer = {
@@ -81,16 +86,39 @@ export default function AssessmentWizardPage() {
       const run = async () => {
         try {
           await api(`/assessments/${id}/answers`, { method: "PUT", body: { answers: [body] } });
-          setStored((s) => new Set(s).add(controlId));
+          storedRef.current = new Set(storedRef.current).add(controlId);
+          setStored(storedRef.current);
           setSaveState((s) => ({ ...s, [controlId]: "saved" }));
+          return true;
         } catch {
           setSaveState((s) => ({ ...s, [controlId]: "error" }));
+          return false;
         }
       };
-      const next = (queues.current.get(controlId) ?? Promise.resolve()).then(run);
+      const next = (queues.current.get(controlId) ?? Promise.resolve(true)).then(run);
       queues.current.set(controlId, next);
+      return next;
     },
     [id],
+  );
+
+  /**
+   * La evidencia se cuelga de una respuesta guardada. Si el control todavía no se
+   * guardó (p. ej. quedó "Sí, aplica" por defecto), se guarda ahora tal como está.
+   */
+  const ensureStored = useCallback(
+    async (answer: Answer) => {
+      const pending = timers.current.get(answer.controlId);
+      if (pending) {
+        clearTimeout(pending.timer);
+        timers.current.delete(answer.controlId);
+        return persist(pending.answer);
+      }
+      if (storedRef.current.has(answer.controlId)) return true;
+      setAnswers((prev) => new Map(prev).set(answer.controlId, answer));
+      return persist(answer);
+    },
+    [persist],
   );
 
   const update = useCallback(
@@ -238,11 +266,12 @@ export default function AssessmentWizardPage() {
               save={saveState[control.id]}
               onRetry={() => {
                 const a = answers.get(control.id);
-                if (a) persist(a);
+                if (a) void persist(a);
               }}
               evidence={evidence.filter((e) => e.controlId === control.id)}
-              canAddEvidence={stored.has(control.id)}
+              onEnsureStored={ensureStored}
               onEvidenceAdded={(ev) => setEvidence((list) => [...list, ev])}
+              onEvidenceDeleted={(evidenceId) => setEvidence((list) => list.filter((e) => e.id !== evidenceId))}
               assessmentId={assessment.id}
               readOnly={readOnly}
             />
@@ -388,8 +417,9 @@ function ControlItem({
   save,
   onRetry,
   evidence,
-  canAddEvidence,
+  onEnsureStored,
   onEvidenceAdded,
+  onEvidenceDeleted,
   assessmentId,
   readOnly,
 }: {
@@ -403,8 +433,9 @@ function ControlItem({
   save: SaveState | undefined;
   onRetry: () => void;
   evidence: Evidence[];
-  canAddEvidence: boolean;
+  onEnsureStored: (answer: Answer) => Promise<boolean>;
   onEvidenceAdded: (ev: Evidence) => void;
+  onEvidenceDeleted: (evidenceId: string) => void;
   assessmentId: string;
   readOnly: boolean;
 }) {
@@ -486,9 +517,10 @@ function ControlItem({
             controlId={control.id}
             assessmentId={assessmentId}
             evidence={evidence}
-            canAdd={canAddEvidence && !readOnly}
             readOnly={readOnly}
+            ensureStored={() => onEnsureStored(current)}
             onAdded={onEvidenceAdded}
+            onDeleted={onEvidenceDeleted}
           />
 
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -560,80 +592,3 @@ function MaturityPicker({
   );
 }
 
-function EvidenceSection({
-  controlId,
-  assessmentId,
-  evidence,
-  canAdd,
-  readOnly,
-  onAdded,
-}: {
-  controlId: string;
-  assessmentId: string;
-  evidence: Evidence[];
-  canAdd: boolean;
-  readOnly: boolean;
-  onAdded: (ev: Evidence) => void;
-}) {
-  const [description, setDescription] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-
-  const add = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setPending(true);
-    try {
-      const ev = await api<Evidence>(`/assessments/${assessmentId}/evidence`, {
-        body: { controlId, source: "manual", description: description.trim() },
-      });
-      onAdded(ev);
-      setDescription("");
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setPending(false);
-    }
-  };
-
-  return (
-    <div className="grid gap-2">
-      <span className="text-sm font-medium">Evidencia</span>
-      {evidence.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Sin evidencia registrada.</p>
-      ) : (
-        <ul className="grid gap-1.5">
-          {evidence.map((ev) => (
-            <li key={ev.id} className="flex items-start gap-2 rounded-md bg-muted px-3 py-2 text-sm">
-              <FileText className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-              <span className="flex-1 break-words">{ev.description}</span>
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {new Date(ev.collectedAt).toLocaleDateString("es-AR")}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {!readOnly &&
-        (canAdd ? (
-          <form onSubmit={add} className="grid gap-2">
-            <FormError message={error} />
-            <div className="flex gap-2">
-              <Input
-                aria-label="Descripción de la evidencia"
-                placeholder="Ej.: Política de accesos v2 aprobada en marzo (link al documento)"
-                maxLength={2000}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-              <Button type="submit" variant="outline" disabled={pending || !description.trim()}>
-                Agregar
-              </Button>
-            </div>
-          </form>
-        ) : (
-          <p className="text-xs text-muted-foreground">Respondé el control para poder adjuntar evidencia.</p>
-        ))}
-    </div>
-  );
-}

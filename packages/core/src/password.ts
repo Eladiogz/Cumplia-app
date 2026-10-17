@@ -9,10 +9,21 @@
 export const PASSWORD_MIN_LENGTH = 12;
 export const PASSWORD_MAX_LENGTH = 128;
 
-export type PasswordRule = "length" | "lowercase" | "uppercase" | "digit" | "symbol" | "repeated" | "personal" | "common";
+export type PasswordRule =
+  | "length"
+  | "tooLong"
+  | "lowercase"
+  | "uppercase"
+  | "digit"
+  | "symbol"
+  | "repeated"
+  | "personal"
+  | "common";
 
 export const PASSWORD_RULES: Record<PasswordRule, string> = {
-  length: `Entre ${PASSWORD_MIN_LENGTH} y ${PASSWORD_MAX_LENGTH} caracteres`,
+  length: `Al menos ${PASSWORD_MIN_LENGTH} caracteres`,
+  // El tope existe para acotar el trabajo del servidor; solo se muestra si se supera.
+  tooLong: `Como máximo ${PASSWORD_MAX_LENGTH} caracteres`,
   lowercase: "Una letra minúscula",
   uppercase: "Una letra mayúscula",
   digit: "Un número",
@@ -69,7 +80,8 @@ export function checkPassword(
 ): PasswordRule[] {
   const failed: PasswordRule[] = [];
   const length = [...password].length;
-  if (length < PASSWORD_MIN_LENGTH || length > PASSWORD_MAX_LENGTH) failed.push("length");
+  if (length < PASSWORD_MIN_LENGTH) failed.push("length");
+  if (length > PASSWORD_MAX_LENGTH) failed.push("tooLong");
   if (!/\p{Ll}/u.test(password)) failed.push("lowercase");
   if (!/\p{Lu}/u.test(password)) failed.push("uppercase");
   if (!/\p{Nd}/u.test(password)) failed.push("digit");
