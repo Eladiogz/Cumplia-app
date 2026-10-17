@@ -15,6 +15,11 @@ const securityHeaders = [
 
 const config: NextConfig = {
   poweredByHeader: false,
+  experimental: {
+    // Evidencia de hasta 10 MB + el "sobre" multipart: el valor por defecto (10 MB) la cortaría.
+    // El límite real lo aplica la API.
+    proxyClientMaxBodySize: "12mb",
+  },
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${apiUrl}/:path*` }];
   },

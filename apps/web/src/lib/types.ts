@@ -96,6 +96,11 @@ export interface Evidence {
   source: string;
   description: string;
   collectedAt: string;
+  /** Solo si tiene archivo adjunto. */
+  fileName: string | null;
+  fileSize: number | null;
+  contentType: string | null;
+  sha256: string | null;
 }
 
 /** Respuesta de login/registro/verificación cuando ya hay sesión. */

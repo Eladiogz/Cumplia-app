@@ -14,6 +14,7 @@ const FALLBACK_MESSAGES: Record<number, string> = {
   401: "Tu sesión terminó. Volvé a ingresar.",
   403: "No tenés permiso para esta acción.",
   404: "No encontramos lo que buscabas.",
+  413: "El archivo es demasiado grande (máximo 10 MB).",
   429: "Demasiados intentos. Esperá un minuto y volvé a probar.",
 };
 
@@ -27,13 +28,15 @@ interface RequestOptions {
  * sesión viaja sola y el navegador agrega el Origin que la API usa contra CSRF.
  */
 export async function api<T>(path: string, { method, body }: RequestOptions = {}): Promise<T> {
+  // Archivos: FormData va tal cual y el navegador arma el content-type con su separador.
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
   let res: Response;
   try {
     res = await fetch(`/api${path}`, {
       method: method ?? (body === undefined ? "GET" : "POST"),
       // Sin cuerpo no se manda content-type: la API rechaza JSON vacío.
-      headers: body === undefined ? undefined : { "content-type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: body === undefined || isForm ? undefined : { "content-type": "application/json" },
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
       credentials: "same-origin",
       cache: "no-store",
     });

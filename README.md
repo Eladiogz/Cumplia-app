@@ -27,7 +27,7 @@ corepack enable
 pnpm install
 pnpm build
 pnpm test
-docker compose up -d db mail   # PostgreSQL (crea el usuario cumplia_api) y Mailpit (http://localhost:8025)
+docker compose up -d db mail files   # PostgreSQL (crea cumplia_api), Mailpit (http://localhost:8025) y SeaweedFS (S3, archivos)
 cp .env.example .env
 sed -i "s|^MFA_ENCRYPTION_KEY=.*|MFA_ENCRYPTION_KEY=$(openssl rand -base64 32)|" .env
 set -a && . ./.env && set +a
@@ -69,6 +69,16 @@ Rutas por organización (requieren sesión; sin ella responden 401, sin el rol n
 | POST | `/assessments` | Crear evaluación (`name` opcional, `targetMaturity` 1-4) | ADMIN, CONSULTANT |
 | PATCH | `/assessments/:id` | Cambiar nombre u objetivo de madurez | ADMIN, CONSULTANT |
 | GET | `/assessments/:id/evidence` | Evidencia registrada, con su control | todos |
+| POST | `/assessments/:id/evidence/files` | Evidencia con archivo (multipart: `controlId`, `description` opcional, `file`) | ADMIN, CONSULTANT |
+| GET | `/assessments/:id/evidence/:evidenceId/file` | Ver o descargar el archivo | todos |
+| DELETE | `/assessments/:id/evidence/:evidenceId` | Borrar evidencia (queda en la auditoría) | ADMIN, CONSULTANT |
+
+### Archivos de evidencia
+- Imágenes **PNG, JPG, WebP** y **PDF**, hasta **10 MB**. El tipo se verifica por el **contenido** del archivo (no por la extensión): un SVG o HTML disfrazado de imagen se rechaza.
+- Se guardan en un almacenamiento **compatible con S3** (AWS S3, Cloudflare R2, Backblaze…; en desarrollo, SeaweedFS con `docker compose up -d files`). En producción `S3_BUCKET` es obligatorio y el bucket debe existir (con AWS, usá `S3_SSE=AES256`).
+- La clave de cada archivo la arma la API bajo `org/<organización>/…`; el nombre del usuario solo se muestra (saneado).
+- Cada archivo guarda su **huella SHA-256**: permite demostrar ante un auditor que no cambió desde que se cargó.
+- Solo se descargan **a través de la API** (que verifica organización y rol), con `nosniff`, CSP `sandbox` y sin caché compartida.
 | GET · PUT | `/assessments/:id/answers` | Leer (todos) y guardar (ADMIN, CONSULTANT) respuestas | — |
 | GET | `/assessments/:id/result` · `/soa` | Puntaje y Declaración de Aplicabilidad | todos |
 | POST | `/assessments/:id/evidence` | Registrar evidencia de un control | ADMIN, CONSULTANT |
