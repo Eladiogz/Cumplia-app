@@ -21,8 +21,12 @@ Monorepo, CI/CD, datos de ISO 27001:2022, motor de puntaje, SoA, API stateless.
 Pendientes menores para más adelante: cola de emails con reintentos (outbox), cambio y recuperación de contraseña, verificación del email en el registro directo.
 
 ## Fase 3 — Aplicación web
-- Next.js: asistente de gap assessment, tablero de madurez, exportación de SoA (PDF/Excel)
-- Registro de riesgos
+- Base Next.js (apps/web), proxy /api, acceso completo: ingreso, registro, MFA, invitaciones, organización y seguridad (hecho)
+- Asistente de gap assessment (respuestas por control, justificación, evidencia)
+- Tablero de madurez (puntaje por dominio, brechas priorizadas)
+- Exportación de la SoA (PDF/Excel)
+- Registro de riesgos (API + web)
+- Pruebas de punta a punta en navegador (Playwright) y Content-Security-Policy con nonce
 
 ## Fase 4 — Evidencias automáticas
 - Integración M365/Entra (MFA, accesos privilegiados, reglas de reenvío)

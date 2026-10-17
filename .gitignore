@@ -1,6 +1,10 @@
 node_modules/
 dist/
 coverage/
+# Next.js (se generan al compilar o con `next typegen`)
+.next/
+next-env.d.ts
+*.tsbuildinfo
 .env
 .env.*
 !.env.example
