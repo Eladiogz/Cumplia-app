@@ -18,7 +18,9 @@ Monorepo, CI/CD, datos de ISO 27001:2022, motor de puntaje, SoA, API stateless.
 - Aislamiento por organización en cada consulta (tests de fuga entre tenants) (hecho)
 - Registro de auditoría de cada cambio (hecho)
 
-Pendientes menores para más adelante: cola de emails con reintentos (outbox), cambio y recuperación de contraseña, verificación del email en el registro directo.
+- Seguridad de cuentas: política de contraseñas robusta (composición + comunes/filtradas + datos personales), recuperación y cambio de contraseña, verificación de email, acciones de ADMIN seguras para multi-tenant (hecho)
+
+Pendientes menores para más adelante: cola de emails con reintentos (outbox), lista de sesiones activas por dispositivo, paleta de colores con fondo menos blanco.
 
 ## Fase 3 — Aplicación web
 - Base Next.js (apps/web), proxy /api, acceso completo: ingreso, registro, MFA, invitaciones, organización y seguridad (hecho)

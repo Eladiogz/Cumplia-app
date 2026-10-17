@@ -1,12 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { MailPlus, ShieldCheck, Trash2, X } from "lucide-react";
+import { KeyRound, LogOut, MailPlus, MoreHorizontal, ShieldCheck, ShieldOff, Trash2, X } from "lucide-react";
 import { Field, FormError, FormSuccess, Spinner } from "@/components/form";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { api, errorMessage } from "@/lib/api";
 import { ROLE_DESCRIPTION, ROLE_LABEL, canManageMembers, canSeeMembers } from "@/lib/roles";
@@ -140,6 +148,7 @@ function Members() {
   const isAdmin = canManageMembers(me.role);
   const [members, setMembers] = useState<Member[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -180,6 +189,7 @@ function Members() {
       </CardHeader>
       <CardContent className="grid gap-4">
         <FormError message={error} />
+        <FormSuccess message={success} />
         {!members ? (
           <Spinner />
         ) : (
@@ -238,9 +248,15 @@ function Members() {
                                 </Button>
                               </span>
                             ) : (
-                              <Button size="icon" variant="ghost" onClick={() => setConfirmRemove(m.userId)} aria-label={`Quitar a ${m.email}`}>
-                                <Trash2 aria-hidden />
-                              </Button>
+                              <MemberActions
+                                member={m}
+                                onRemove={() => setConfirmRemove(m.userId)}
+                                onResult={(message, ok) => {
+                                  setError(ok ? null : message);
+                                  setSuccess(ok ? message : null);
+                                  load();
+                                }}
+                              />
                             ))}
                         </td>
                       )}
@@ -253,6 +269,78 @@ function Members() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Ayuda a un miembro con su cuenta sin tocar nunca su contraseña. Restablecer el MFA
+ * solo funciona si la cuenta es exclusiva de esta organización (la API lo verifica).
+ */
+function MemberActions({
+  member,
+  onRemove,
+  onResult,
+}: {
+  member: Member;
+  onRemove: () => void;
+  onResult: (message: string, ok: boolean) => void;
+}) {
+  const run = async (action: () => Promise<unknown>, message: string) => {
+    try {
+      await action();
+      onResult(message, true);
+    } catch (e) {
+      onResult(errorMessage(e), false);
+    }
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="icon" variant="ghost" aria-label={`Acciones para ${member.email}`}>
+          <MoreHorizontal aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>{member.email}</DropdownMenuLabel>
+        <DropdownMenuItem
+          onSelect={() =>
+            void run(
+              () => api(`/members/${member.userId}/password-reset`, { body: {} }),
+              `Le enviamos a ${member.email} un link para elegir una contraseña nueva.`,
+            )
+          }
+        >
+          <KeyRound aria-hidden /> Enviar link para restablecer la contraseña
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() =>
+            void run(
+              () => api(`/members/${member.userId}/sessions/revoke`, { body: {} }),
+              `Cerramos las sesiones de ${member.email} en esta organización.`,
+            )
+          }
+        >
+          <LogOut aria-hidden /> Cerrar sus sesiones
+        </DropdownMenuItem>
+        {member.mfaEnabled && (
+          <DropdownMenuItem
+            onSelect={() =>
+              void run(
+                () => api(`/members/${member.userId}/mfa`, { method: "DELETE" }),
+                `Restablecimos el MFA de ${member.email}. Le avisamos por email.`,
+              )
+            }
+          >
+            <ShieldOff aria-hidden /> Restablecer su MFA
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={onRemove}>
+          <Trash2 aria-hidden /> Quitar de la organización
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -323,10 +411,12 @@ function Invitations() {
                 ))}
               </NativeSelect>
             </Field>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending || !me.emailVerified}>
               <MailPlus aria-hidden /> {pending ? "Enviando…" : "Invitar"}
             </Button>
-            <p className="text-xs text-muted-foreground md:col-span-3">{ROLE_DESCRIPTION[role]}</p>
+            <p className="text-xs text-muted-foreground md:col-span-3">
+              {me.emailVerified ? ROLE_DESCRIPTION[role] : "Para invitar, primero confirmá tu email (revisá tu casilla)."}
+            </p>
           </form>
         )}
         {!invitations ? (

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import { Field, FormError } from "@/components/form";
+import { NewPasswordField } from "@/components/password-field";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,10 +15,11 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const set = (key: keyof typeof form) => (e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, [key]: e.target.value });
+  const context = { email: form.email, name: form.name, organizationName: form.organizationName };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const problem = passwordProblem(form.password, form.confirm, form.email);
+    const problem = passwordProblem(form.password, form.confirm, context);
     if (problem) return setError(problem);
     setError(null);
     setPending(true);
@@ -55,19 +57,7 @@ export default function RegisterPage() {
           <Field id="email" label="Email">
             <Input id="email" type="email" autoComplete="email" required value={form.email} onChange={set("email")} />
           </Field>
-          <Field id="password" label="Contraseña" hint="Mínimo 12 caracteres. Una frase larga es más segura y fácil de recordar.">
-            <Input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={12}
-              maxLength={128}
-              aria-describedby="password-hint"
-              value={form.password}
-              onChange={set("password")}
-            />
-          </Field>
+          <NewPasswordField id="password" value={form.password} onChange={(password) => setForm({ ...form, password })} context={context} />
           <Field id="confirm" label="Repetí la contraseña">
             <Input id="confirm" type="password" autoComplete="new-password" required value={form.confirm} onChange={set("confirm")} />
           </Field>

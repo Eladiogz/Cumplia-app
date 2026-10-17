@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { MailCheck } from "lucide-react";
 import { Field, FormError, Spinner } from "@/components/form";
+import { NewPasswordField } from "@/components/password-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -147,10 +148,11 @@ function CreateAccount({ token, invitation }: { token: string; invitation: Invit
   const [accountExists, setAccountExists] = useState(false);
   const [pending, setPending] = useState(false);
   const backHere = loginUrl(`/invitaciones/aceptar#token=${encodeURIComponent(token)}`);
+  const context = { email: invitation.email, name, organizationName: invitation.organizationName };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const problem = passwordProblem(password, confirm, invitation.email);
+    const problem = passwordProblem(password, confirm, context);
     if (problem) return setError(problem);
     setError(null);
     setPending(true);
@@ -189,18 +191,7 @@ function CreateAccount({ token, invitation }: { token: string; invitation: Invit
       <Field id="name" label="Tu nombre (opcional)">
         <Input id="name" autoComplete="name" maxLength={100} value={name} onChange={(e) => setName(e.target.value)} />
       </Field>
-      <Field id="password" label="Elegí una contraseña" hint="Mínimo 12 caracteres.">
-        <Input
-          id="password"
-          type="password"
-          autoComplete="new-password"
-          required
-          minLength={12}
-          aria-describedby="password-hint"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-      </Field>
+      <NewPasswordField id="password" label="Elegí una contraseña" value={password} onChange={setPassword} context={context} />
       <Field id="confirm" label="Repetí la contraseña">
         <Input id="confirm" type="password" autoComplete="new-password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
       </Field>

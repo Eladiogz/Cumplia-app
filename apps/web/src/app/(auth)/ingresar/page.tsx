@@ -49,6 +49,9 @@ function LoginForm() {
             <Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           </Field>
           <Field id="password" label="Contraseña">
+            <Link href="/olvide-contrasena" className="justify-self-end text-xs text-primary hover:underline">
+              ¿Olvidaste tu contraseña?
+            </Link>
             <Input
               id="password"
               type="password"

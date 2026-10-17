@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { Building2, Check, ChevronsUpDown, ClipboardList, Home, LogOut, ShieldCheck, ShieldAlert } from "lucide-react";
+import { Building2, Check, ChevronsUpDown, ClipboardList, Home, LogOut, MailWarning, ShieldCheck, ShieldAlert } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { errorMessage } from "@/lib/api";
+import { api, errorMessage } from "@/lib/api";
 import { ROLE_LABEL } from "@/lib/roles";
 import { logout, switchOrganization, useMe } from "@/lib/session";
 import { cn } from "@/lib/utils";
@@ -48,6 +48,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
         <Nav className="overflow-x-auto border-b bg-card px-2 py-1 md:hidden" />
         <main className="mx-auto w-full max-w-5xl flex-1 p-4 md:p-8">
+          {!me.emailVerified && <VerifyEmailBanner email={me.user.email} />}
           {me.mfaSetupRequired && (
             <Alert variant="warning" className="mb-6">
               <ShieldAlert aria-hidden />
@@ -60,6 +61,40 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
     </div>
+  );
+}
+
+/** Aviso mientras el email no está confirmado, con reenvío del link. */
+function VerifyEmailBanner({ email }: { email: string }) {
+  const [message, setMessage] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const resend = async () => {
+    setPending(true);
+    try {
+      const res = await api<{ message: string }>("/auth/email/verification", { method: "POST" });
+      setMessage(res.message);
+    } catch (e) {
+      setMessage(errorMessage(e));
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <Alert className="mb-6">
+      <MailWarning aria-hidden />
+      <AlertDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span>
+          Confirmá tu email ({email}) con el link que te enviamos. Hasta entonces no podés invitar a otras personas.
+        </span>
+        {message ? (
+          <span className="font-medium">{message}</span>
+        ) : (
+          <Button size="sm" variant="link" className="h-auto p-0" disabled={pending} onClick={() => void resend()}>
+            Reenviar el link
+          </Button>
+        )}
+      </AlertDescription>
+    </Alert>
   );
 }
 

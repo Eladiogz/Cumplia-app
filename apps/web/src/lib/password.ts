@@ -1,8 +1,13 @@
-/** Misma política que la API (mínimo 12, máximo 128, distinta del email), validada antes de enviar. */
-export function passwordProblem(password: string, confirm: string, email: string): string | null {
-  if (password.length < 12) return "La contraseña debe tener al menos 12 caracteres.";
-  if (password.length > 128) return "La contraseña no puede superar los 128 caracteres.";
-  if (password.toLowerCase() === email.trim().toLowerCase()) return "La contraseña no puede ser tu email.";
+import { PASSWORD_RULES, checkPassword, type PasswordContext } from "@cumplia/core/password";
+
+/**
+ * Valida en el navegador con la misma política que la API (composición y datos
+ * personales). La lista de contraseñas comunes/filtradas solo la tiene la API:
+ * si la rechaza por eso, el mensaje llega en la respuesta.
+ */
+export function passwordProblem(password: string, confirm: string, context: PasswordContext): string | null {
+  const [first] = checkPassword(password, context);
+  if (first) return `La contraseña necesita: ${PASSWORD_RULES[first].toLowerCase()}.`;
   if (password !== confirm) return "Las contraseñas no coinciden.";
   return null;
 }
