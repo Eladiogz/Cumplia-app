@@ -116,6 +116,7 @@ export async function findActiveSession(db: Db, tokenHash: string) {
       role: memberships.role,
       expiresAt: sessions.expiresAt,
       userMfaEnabled: sql<boolean>`${users.mfaEnabledAt} is not null`,
+      userEmailVerified: sql<boolean>`${users.emailVerifiedAt} is not null`,
       organizationRequiresMfa: organizations.requireMfa,
     })
     .from(sessions)

@@ -13,7 +13,7 @@ let ctx: Awaited<ReturnType<typeof createTestDb>>;
 let app: ReturnType<typeof buildApp>;
 const mailer = new MemoryMailer();
 
-const PASSWORD = "clave-segura-de-prueba";
+const PASSWORD = "Clave-Segura-de-Prueba-2026";
 
 beforeAll(async () => {
   ctx = await createTestDb();
@@ -45,6 +45,8 @@ const subjectsTo = (to: string) => mailer.sent.filter((m) => m.to === to).map((m
 const register = async (organizationName = "Empresa") => {
   const email = uniqueEmail();
   const res = await call("POST", "/auth/register", undefined, { email, password: PASSWORD, organizationName });
+  // Invitar exige email verificado (el flujo de verificación se prueba en account-security.test.ts).
+  await ctx.db.update(schema.users).set({ emailVerifiedAt: new Date() }).where(eq(schema.users.email, email));
   return { email, cookie: cookieOf(res)!, orgId: (res.json() as { organization: { id: string } }).organization.id };
 };
 
@@ -62,7 +64,7 @@ const withMfa = async () => {
 describe("avisos de seguridad por email", () => {
   it("avisa al activar y al desactivar MFA", async () => {
     const user = await withMfa();
-    expect(subjectsTo(user.email)).toEqual(["Activaste la verificación en dos pasos"]);
+    expect(subjectsTo(user.email)).toContain("Activaste la verificación en dos pasos");
     const res = await call("POST", "/auth/mfa/disable", user.cookie, { password: PASSWORD, code: totp(user.key) });
     expect(res.statusCode).toBe(204);
     expect(subjectsTo(user.email)).toContain("Se desactivó la verificación en dos pasos");

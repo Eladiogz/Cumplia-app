@@ -71,6 +71,13 @@
       "when": 1792192987772,
       "tag": "0009_last_organization",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792260778232,
+      "tag": "0010_account_security",
+      "breakpoints": true
     }
   ]
 }

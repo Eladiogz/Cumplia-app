@@ -12,6 +12,8 @@ export interface Tenant {
   mfaEnabled: boolean;
   /** La organización exige MFA y el usuario todavía no lo activó: solo puede configurarlo. */
   mfaSetupRequired: boolean;
+  /** Confirmó su email (algunas acciones, como invitar, lo exigen). */
+  emailVerified: boolean;
 }
 
 /** Devuelve el tenant de la petición o null si no está autenticada. */
@@ -39,6 +41,7 @@ export function createSessionTenantResolver(db: Db): TenantResolver {
       role: session.role,
       mfaEnabled: session.userMfaEnabled,
       mfaSetupRequired: session.organizationRequiresMfa && !session.userMfaEnabled,
+      emailVerified: session.userEmailVerified,
     };
   };
 }
@@ -71,6 +74,7 @@ export function createDevTenantResolver(db: Db): TenantResolver {
       role: role.success ? role.data : "ADMIN",
       mfaEnabled: false,
       mfaSetupRequired: false,
+      emailVerified: true,
     };
   };
 }

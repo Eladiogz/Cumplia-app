@@ -38,6 +38,8 @@ export const users = pgTable("users", {
   name: text("name"),
   // Nulo = sin contraseña local (p. ej. futuro SSO): no puede iniciar sesión con clave.
   passwordHash: text("password_hash"),
+  // Se confirmó que la persona controla el email (link de verificación, invitación o restablecimiento).
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
   lockedUntil: timestamp("locked_until", { withTimezone: true }),
   // Secreto TOTP cifrado (AES-256-GCM) con una clave que NO está en la base.
@@ -50,6 +52,28 @@ export const users = pgTable("users", {
   lastOrganizationId: uuid("last_organization_id").references(() => organizations.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const userTokenPurposeEnum = pgEnum("user_token_purpose", ["password_reset", "email_verification"]);
+
+/**
+ * Tokens de un solo uso que viajan por email (restablecer contraseña, verificar email).
+ * Solo se guarda el hash. Son de la cuenta, no de una organización: sin RLS.
+ */
+export const userTokens = pgTable(
+  "user_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    purpose: userTokenPurposeEnum("purpose").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    // ADMIN que lo pidió para un miembro (nulo = lo pidió la propia persona o el sistema).
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+  },
+  (t) => [index("user_tokens_user_purpose_idx").on(t.userId, t.purpose)],
+);
 
 export const memberships = pgTable(
   "memberships",

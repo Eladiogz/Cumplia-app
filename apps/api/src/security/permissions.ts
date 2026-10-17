@@ -23,12 +23,19 @@ const MATRIX: Record<Role, readonly Permission[]> = {
 
 export const can = (role: Role, permission: Permission) => MATRIX[role].includes(permission);
 
-/** Opciones de ruta: `app.get(url, requires("assessment:read"), handler)`. */
-export const requires = (permission: Permission) => ({ config: { permission } });
+/**
+ * Opciones de ruta: `app.get(url, requires("assessment:read"), handler)`.
+ * `verifiedEmail`: además exige que la persona haya confirmado su email.
+ */
+export const requires = (permission: Permission, { verifiedEmail = false } = {}) => ({
+  config: { permission, verifiedEmail },
+});
 
 declare module "fastify" {
   interface FastifyContextConfig {
     /** Permiso que exige la ruta. Toda ruta protegida DEBE declararlo (ver protected.ts). */
     permission?: Permission;
+    /** La ruta exige email verificado (p. ej. invitar a otras personas). */
+    verifiedEmail?: boolean;
   }
 }

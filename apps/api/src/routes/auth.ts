@@ -1,4 +1,4 @@
-import type { FastifyBaseLogger, FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import {
   ConflictError,
@@ -10,13 +10,15 @@ import {
   forOrganization,
   getLoginMembership,
   getUserById,
-  registerFailedLogin,
   registerUserWithOrganization,
   type Db,
 } from "@cumplia/db";
-import { notify, type Mailer } from "../email/mailer.js";
-import { accountLockedEmail } from "../email/templates.js";
+import type { Mailer } from "../email/mailer.js";
+import { failedAttempt } from "../security/lockout.js";
 import { dummyHash, hashPassword, verifyPassword } from "../security/password.js";
+import { assertStrongPassword } from "../security/password-policy.js";
+import { sendEmailVerification } from "./password.js";
+import { Email, NewPassword } from "./schemas.js";
 import {
   MFA_CHALLENGE_COOKIE,
   MFA_CHALLENGE_MINUTES,
@@ -27,21 +29,14 @@ import {
   startSession,
 } from "../security/session.js";
 
-export const MAX_ATTEMPTS = 5;
-export const LOCK_MINUTES = 15;
 export const INVALID = "Credenciales inválidas";
 
-export const Email = z.string().trim().toLowerCase().email().max(254);
-export const Password = z.string().min(12, "Mínimo 12 caracteres").max(128);
-
-const RegisterBody = z
-  .object({
-    email: Email,
-    password: Password,
-    name: z.string().trim().min(1).max(100).optional(),
-    organizationName: z.string().trim().min(2).max(120),
-  })
-  .refine((b) => b.password.toLowerCase() !== b.email, { message: "La contraseña no puede ser el email", path: ["password"] });
+const RegisterBody = z.object({
+  email: Email,
+  password: NewPassword,
+  name: z.string().trim().min(1).max(100).optional(),
+  organizationName: z.string().trim().min(2).max(120),
+});
 
 const LoginBody = z.object({ email: Email, password: z.string().min(1).max(128) });
 
@@ -53,23 +48,14 @@ interface Options {
   mailer: Mailer;
   /** Ruta (vista desde el navegador) a la que viaja la cookie del desafío MFA. */
   mfaCookiePath: string;
+  /** URL del frontend para los links de los emails. */
+  appUrl: string;
 }
 
-/**
- * Registra un intento fallido y, si con él se bloqueó la cuenta, avisa por email
- * (en segundo plano: la respuesta tarda lo mismo, no revela que la cuenta existe).
- */
-export async function failedAttempt(
-  db: Db,
-  { mailer, log }: { mailer: Mailer; log: FastifyBaseLogger },
-  user: { id: string; email: string },
+export async function authRoutes(
+  app: FastifyInstance,
+  { db, secureCookies, authRateLimit, mailer, mfaCookiePath, appUrl }: Options,
 ) {
-  if (await registerFailedLogin(db, user.id, MAX_ATTEMPTS, LOCK_MINUTES)) {
-    notify(mailer, log, accountLockedEmail(user.email, LOCK_MINUTES));
-  }
-}
-
-export async function authRoutes(app: FastifyInstance, { db, secureCookies, authRateLimit, mailer, mfaCookiePath }: Options) {
   // Límite propio y más estricto que el global para frenar fuerza bruta.
   const strict = { config: { rateLimit: { max: authRateLimit, timeWindow: "1 minute" } } };
 
@@ -88,6 +74,7 @@ export async function authRoutes(app: FastifyInstance, { db, secureCookies, auth
 
   app.post("/auth/register", strict, async (req, reply) => {
     const body = RegisterBody.parse(req.body);
+    assertStrongPassword(body.password, { email: body.email, name: body.name, organizationName: body.organizationName });
     try {
       const { user, organization, role } = await registerUserWithOrganization(db, {
         email: body.email,
@@ -96,6 +83,8 @@ export async function authRoutes(app: FastifyInstance, { db, secureCookies, auth
         organizationName: body.organizationName,
       });
       await startSession(db, reply, { userId: user.id, organizationId: organization.id, secureCookies });
+      // Puede usar la cuenta ya; algunas acciones (invitar) esperan a que confirme el email.
+      await sendEmailVerification({ db, mailer, log: req.log, appUrl }, user);
       return reply.code(201).send({
         user: { id: user.id, email: user.email, name: user.name },
         organization: { id: organization.id, name: organization.name },
@@ -170,6 +159,7 @@ export async function authRoutes(app: FastifyInstance, { db, secureCookies, auth
       organizationId: session.organizationId,
       role: session.role,
       mfaEnabled: user.mfaEnabledAt !== null,
+      emailVerified: user.emailVerifiedAt !== null,
       // El frontend lo usa para llevar al usuario a configurar MFA antes que nada.
       mfaSetupRequired: session.organizationRequiresMfa && user.mfaEnabledAt === null,
     };

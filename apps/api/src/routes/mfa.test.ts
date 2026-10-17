@@ -11,7 +11,7 @@ import { createSessionTenantResolver } from "../tenant.js";
 let ctx: Awaited<ReturnType<typeof createTestDb>>;
 let app: ReturnType<typeof buildApp>;
 
-const PASSWORD = "clave-segura-de-prueba";
+const PASSWORD = "Clave-Segura-de-Prueba-2026";
 const KEY = randomBytes(32);
 
 beforeAll(async () => {

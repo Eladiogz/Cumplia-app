@@ -31,7 +31,8 @@ import {
   otpauthUri,
   verifyTotp,
 } from "../security/totp.js";
-import { INVALID, MAX_ATTEMPTS, failedAttempt } from "./auth.js";
+import { MAX_ATTEMPTS, failedAttempt } from "../security/lockout.js";
+import { INVALID } from "./auth.js";
 
 const SecondFactor = z
   .object({

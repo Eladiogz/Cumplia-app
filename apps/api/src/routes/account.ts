@@ -11,15 +11,16 @@ import {
   type Db,
 } from "@cumplia/db";
 import { hashPassword } from "../security/password.js";
+import { assertStrongPassword } from "../security/password-policy.js";
 import { currentSession, hashToken, startSession } from "../security/session.js";
-import { Password } from "./auth.js";
+import { NewPassword } from "./schemas.js";
 
 const Token = z.string().trim().min(20).max(200);
 const PreviewBody = z.object({ token: Token });
 const AcceptBody = z.object({
   token: Token,
   // Solo para crear una cuenta nueva; con sesión iniciada se ignoran.
-  password: Password.optional(),
+  password: NewPassword.optional(),
   name: z.string().trim().min(1).max(100).optional(),
 });
 const SwitchBody = z.object({ organizationId: z.string().uuid() });
@@ -80,9 +81,11 @@ export async function accountRoutes(app: FastifyInstance, { db, secureCookies, a
     if (!body.password) return reply.code(400).send({ error: "Para crear tu cuenta, elegí una contraseña" });
     const preview = await findInvitationByToken(db, tokenHash);
     if (!preview) return reply.code(404).send({ error: INVALID_INVITATION });
-    if (body.password.toLowerCase() === preview.email) {
-      return reply.code(400).send({ error: "La contraseña no puede ser el email" });
-    }
+    assertStrongPassword(body.password, {
+      email: preview.email,
+      name: body.name,
+      organizationName: preview.organizationName,
+    });
     try {
       const created = await registerFromInvitation(db, {
         tokenHash,

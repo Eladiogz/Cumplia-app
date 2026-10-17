@@ -93,7 +93,8 @@ export async function registerFromInvitation(db: Db, input: { tokenHash: string;
       if (!preview) return null;
       const [user] = await tx
         .insert(users)
-        .values({ email: preview.email, name: input.name ?? null, passwordHash: input.passwordHash })
+        // El link llegó a esa casilla: el email queda verificado.
+        .values({ email: preview.email, name: input.name ?? null, passwordHash: input.passwordHash, emailVerifiedAt: sql`now()` })
         .returning();
       if (!user) throw new Error("No se pudo crear el usuario");
       const inv = await redeem(tx, input.tokenHash, user.id);

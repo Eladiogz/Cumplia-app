@@ -17,7 +17,7 @@ let ctx: Awaited<ReturnType<typeof createTestDb>>;
 let app: ReturnType<typeof buildApp>;
 const routes: { method: string; url: string }[] = [];
 
-const PASSWORD = "clave-segura-de-prueba";
+const PASSWORD = "Clave-Segura-de-Prueba-2026";
 
 // Datos de la organización A que B nunca debe ver ni tocar.
 const A = { orgId: "", assessmentId: "", memberId: "", memberEmail: "", adminEmail: "", invitationId: "", invitedEmail: "" };
@@ -36,6 +36,8 @@ const BODIES: Record<string, object> = {
   "PUT /assessments/:id/answers": { answers: [{ controlId: "A.5.1", applicable: true, maturity: 4 }] },
   "POST /assessments/:id/evidence": { controlId: "A.5.1", source: "manual", description: "intrusa" },
   "PATCH /members/:userId": { role: "AUDITOR" },
+  "POST /members/:userId/password-reset": {},
+  "POST /members/:userId/sessions/revoke": {},
 };
 
 const register = async (email: string, organizationName: string) => {
@@ -136,7 +138,9 @@ describe("aislamiento entre organizaciones en todas las rutas protegidas", () =>
     expect(members.find((m) => m.userId === A.memberId)?.role).toBe("CONSULTANT");
     const log = (await call("GET", "/audit-log", cookieA)).json() as { action: string }[];
     expect(log.map((l) => l.action)).not.toContain("member.remove");
-    expect(log.map((l) => l.action)).not.toContain("invitation.revoke");
+    for (const action of ["invitation.revoke", "member.password_reset_sent", "member.sessions_revoked", "member.mfa_reset"]) {
+      expect(log.map((l) => l.action)).not.toContain(action);
+    }
     const pendingInvitations = (await call("GET", "/invitations", cookieA)).json() as { id: string }[];
     expect(pendingInvitations.map((i) => i.id)).toContain(A.invitationId);
   });

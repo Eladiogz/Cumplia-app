@@ -10,7 +10,9 @@ import { createLogMailer, type Mailer } from "./email/mailer.js";
 import { accountRoutes } from "./routes/account.js";
 import { authRoutes } from "./routes/auth.js";
 import { mfaRoutes } from "./routes/mfa.js";
+import { passwordRoutes } from "./routes/password.js";
 import { protectedRoutes } from "./protected.js";
+import { WeakPasswordError } from "./security/password-policy.js";
 import { MFA_CHALLENGE_PATH } from "./security/session.js";
 import type { TenantResolver } from "./tenant.js";
 
@@ -82,6 +84,9 @@ export function buildApp({
     if (err instanceof ZodError) {
       return reply.code(400).send({ error: "Solicitud inválida", details: err.flatten() });
     }
+    if (err instanceof WeakPasswordError) {
+      return reply.code(400).send({ error: err.message, code: "WEAK_PASSWORD", rules: err.rules });
+    }
     if (err instanceof ValidationError) return reply.code(400).send({ error: err.message });
     if (err instanceof ConflictError) return reply.code(409).send({ error: err.message });
     if (err instanceof NotFoundError) return reply.code(404).send({ error: err.message });
@@ -126,7 +131,8 @@ export function buildApp({
   });
 
   if (db) {
-    app.register(authRoutes, { db, secureCookies, authRateLimit, mailer, mfaCookiePath });
+    app.register(authRoutes, { db, secureCookies, authRateLimit, mailer, mfaCookiePath, appUrl });
+    app.register(passwordRoutes, { db, mailer, appUrl, authRateLimit });
     app.register(accountRoutes, { db, secureCookies, authRateLimit });
     if (mfaEncryptionKey) {
       app.register(mfaRoutes, { db, secureCookies, authRateLimit, encryptionKey: mfaEncryptionKey, mailer, mfaCookiePath });
