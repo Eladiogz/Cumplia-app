@@ -2,20 +2,14 @@ import { z } from "zod";
 import type { Framework } from "@cumplia/frameworks";
 
 /** Escala de madurez: 0 inexistente · 1 inicial · 2 definido · 3 implementado · 4 medido y mejorado */
-export const MATURITY_LABELS = [
-  "No implementado",
-  "Inicial",
-  "Definido",
-  "Implementado",
-  "Medido y mejorado",
-] as const;
+export { MATURITY_LABELS, MATURITY_LEVELS, type MaturityLevel } from "./maturity.js";
 
 export const AnswerSchema = z
   .object({
     controlId: z.string(),
     applicable: z.boolean(),
     maturity: z.number().int().min(0).max(4).optional(),
-    justification: z.string().optional(),
+    justification: z.string().max(2000).optional(),
   })
   .refine((a) => a.applicable || (a.justification ?? "").trim().length > 0, {
     message: "Un control no aplicable requiere justificación (Declaración de Aplicabilidad)",

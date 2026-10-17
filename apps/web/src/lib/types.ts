@@ -56,9 +56,46 @@ export interface InvitationPreview {
 
 export interface Assessment {
   id: string;
+  name: string;
   frameworkId: string;
   targetMaturity: number;
   createdAt: string;
+  updatedAt: string;
+}
+
+/** Elemento del listado: con el avance. */
+export interface AssessmentSummary extends Assessment {
+  answered: number;
+  total: number;
+}
+
+export interface Control {
+  id: string;
+  domain: string;
+  title: string;
+}
+
+export interface Framework {
+  id: string;
+  name: string;
+  version: string;
+  domains: Record<string, string>;
+  controls: Control[];
+}
+
+export interface Answer {
+  controlId: string;
+  applicable: boolean;
+  maturity?: number | null;
+  justification?: string;
+}
+
+export interface Evidence {
+  id: string;
+  controlId: string;
+  source: string;
+  description: string;
+  collectedAt: string;
 }
 
 /** Respuesta de login/registro/verificación cuando ya hay sesión. */

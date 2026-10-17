@@ -28,7 +28,7 @@ afterAll(async () => {
   await ctx.close();
 });
 
-const call = (method: "GET" | "POST" | "PUT", url: string, org: string | null, payload?: object) =>
+const call = (method: "GET" | "POST" | "PUT" | "PATCH", url: string, org: string | null, payload?: object) =>
   app.inject({ method, url, payload, headers: org ? { "x-org": org } : {} });
 
 const createAssessment = async (org: string) =>
@@ -92,6 +92,54 @@ describe("evaluaciones", () => {
     expect(ev.statusCode).toBe(201);
     const log = (await call("GET", "/audit-log", orgA)).json() as { action: string }[];
     expect(log.map((l) => l.action)).toEqual(expect.arrayContaining(["assessment.create", "answers.save", "evidence.add"]));
+  });
+});
+
+describe("datos para el asistente", () => {
+  it("nombre por defecto o propio, y avance en el listado", async () => {
+    const plain = (await call("POST", "/assessments", orgA, { frameworkId: "iso27001-2022" })).json();
+    expect(plain.name).toBe("Evaluación ISO/IEC 27001:2022");
+    const named = (await call("POST", "/assessments", orgA, { frameworkId: "iso27001-2022", name: "  Gap 2026  " })).json();
+    expect(named.name).toBe("Gap 2026");
+
+    await call("PUT", `/assessments/${named.id}/answers`, orgA, {
+      answers: [
+        { controlId: "A.5.1", applicable: true, maturity: 2 },
+        { controlId: "A.5.2", applicable: true }, // aplica pero sin madurez: pendiente
+        { controlId: "A.7.1", applicable: false, justification: "Sin oficinas" },
+      ],
+    });
+    const list = (await call("GET", "/assessments", orgA)).json() as { id: string; answered: number; total: number }[];
+    expect(list[0]?.id).toBe(named.id); // la modificada más recientemente, primero
+    expect(list.find((a) => a.id === named.id)).toMatchObject({ answered: 2, total: 93 });
+  });
+
+  it("cambia nombre y objetivo, con validación y auditoría", async () => {
+    const id = await createAssessment(orgA);
+    const res = await call("PATCH", `/assessments/${id}`, orgA, { name: "Gap anual", targetMaturity: 4 });
+    expect(res.json()).toMatchObject({ name: "Gap anual", targetMaturity: 4 });
+    expect((await call("PATCH", `/assessments/${id}`, orgA, {})).statusCode).toBe(400);
+    expect((await call("PATCH", `/assessments/${id}`, orgA, { targetMaturity: 5 })).statusCode).toBe(400);
+    expect((await call("PATCH", `/assessments/${id}`, orgA, { name: "x".repeat(121) })).statusCode).toBe(400);
+    const log = (await call("GET", "/audit-log", orgA)).json() as { action: string; details: unknown }[];
+    expect(log.find((l) => l.action === "assessment.update")?.details).toEqual({ name: "Gap anual", targetMaturity: 4 });
+  });
+
+  it("lista la evidencia con su control", async () => {
+    const id = await createAssessment(orgA);
+    await call("PUT", `/assessments/${id}/answers`, orgA, { answers: [{ controlId: "A.8.5", applicable: true, maturity: 3 }] });
+    await call("POST", `/assessments/${id}/evidence`, orgA, { controlId: "A.8.5", source: "manual", description: "Política de MFA v2" });
+    const evidence = (await call("GET", `/assessments/${id}/evidence`, orgA)).json();
+    expect(evidence).toEqual([expect.objectContaining({ controlId: "A.8.5", source: "manual", description: "Política de MFA v2" })]);
+    expect((await call("GET", `/assessments/${id}/evidence`, orgB)).statusCode).toBe(404);
+  });
+
+  it("limita el largo de la justificación", async () => {
+    const id = await createAssessment(orgA);
+    const res = await call("PUT", `/assessments/${id}/answers`, orgA, {
+      answers: [{ controlId: "A.7.1", applicable: false, justification: "x".repeat(2001) }],
+    });
+    expect(res.statusCode).toBe(400);
   });
 });
 

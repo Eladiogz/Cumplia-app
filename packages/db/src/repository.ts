@@ -105,6 +105,13 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
     }));
   };
 
+  /** Marca la evaluación como modificada ahora. */
+  const touch = (tx: Tx, assessmentId: string) =>
+    tx
+      .update(assessments)
+      .set({ updatedAt: sql`now()` })
+      .where(and(eq(assessments.id, assessmentId), eq(assessments.organizationId, organizationId)));
+
   const ownedAssessment = async (tx: Tx, assessmentId: string) => {
     const [row] = await tx
       .select()
@@ -114,7 +121,7 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
   };
 
   return {
-    async createAssessment(frameworkId: string, targetMaturity = 3) {
+    async createAssessment(frameworkId: string, targetMaturity = 3, name?: string) {
       try {
         loadFramework(frameworkId); // valida que exista
       } catch {
@@ -123,22 +130,70 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
       return inTenant(async (tx) => {
         const [a] = await tx
           .insert(assessments)
-          .values({ organizationId, frameworkId, targetMaturity })
+          .values({ organizationId, frameworkId, targetMaturity, ...(name ? { name } : {}) })
           .returning();
         if (!a) throw new Error("No se pudo crear la evaluación");
-        await audit(tx, "assessment.create", "assessment", a.id);
+        await audit(tx, "assessment.create", "assessment", a.id, { name: a.name, frameworkId });
         return a;
       });
     },
 
+    /** Evaluaciones con su avance: controles ya resueltos (no aplica, o con madurez). */
     listAssessments() {
       return inTenant((tx) =>
         tx
-          .select()
+          .select({
+            id: assessments.id,
+            name: assessments.name,
+            frameworkId: assessments.frameworkId,
+            targetMaturity: assessments.targetMaturity,
+            createdAt: assessments.createdAt,
+            updatedAt: assessments.updatedAt,
+            // Alias explícitos: dentro de la subconsulta, "id" a secas sería el de control_answers.
+            answered: sql<number>`(
+              select count(*)::int from control_answers ca
+              where ca.assessment_id = "assessments"."id"
+                and ca.organization_id = ${organizationId}
+                and (ca.applicable = false or ca.maturity is not null)
+            )`,
+          })
           .from(assessments)
           .where(eq(assessments.organizationId, organizationId))
-          .orderBy(desc(assessments.createdAt)),
+          .orderBy(desc(assessments.updatedAt)),
       );
+    },
+
+    /** Cambia nombre u objetivo de madurez. */
+    async updateAssessment(assessmentId: string, changes: { name?: string; targetMaturity?: number }) {
+      return inTenant(async (tx) => {
+        const [a] = await tx
+          .update(assessments)
+          .set({ ...changes, updatedAt: sql`now()` })
+          .where(and(eq(assessments.id, assessmentId), eq(assessments.organizationId, organizationId)))
+          .returning();
+        if (!a) throw new NotFoundError("Evaluación");
+        await audit(tx, "assessment.update", "assessment", assessmentId, changes);
+        return a;
+      });
+    },
+
+    /** Evidencia registrada en la evaluación, con el control al que pertenece. */
+    async listEvidence(assessmentId: string) {
+      return inTenant(async (tx) => {
+        if (!(await ownedAssessment(tx, assessmentId))) throw new NotFoundError("Evaluación");
+        return tx
+          .select({
+            id: evidence.id,
+            controlId: controlAnswers.controlId,
+            source: evidence.source,
+            description: evidence.description,
+            collectedAt: evidence.collectedAt,
+          })
+          .from(evidence)
+          .innerJoin(controlAnswers, eq(controlAnswers.id, evidence.controlAnswerId))
+          .where(and(eq(controlAnswers.assessmentId, assessmentId), eq(evidence.organizationId, organizationId)))
+          .orderBy(asc(evidence.collectedAt));
+      });
     },
 
     getAssessment(assessmentId: string) {
@@ -171,7 +226,11 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
               setWhere: eq(controlAnswers.organizationId, organizationId),
             });
         }
-        await audit(tx, "answers.save", "assessment", assessmentId);
+        await touch(tx, assessmentId);
+        await audit(tx, "answers.save", "assessment", assessmentId, {
+          controls: answers.map((a) => a.controlId).slice(0, 20).join(", "),
+          count: answers.length,
+        });
         return answers.length;
       });
     },
@@ -207,8 +266,9 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
           .values({ organizationId, controlAnswerId: answer.id, source, description })
           .returning();
         if (!ev) throw new Error("No se pudo guardar la evidencia");
-        await audit(tx, "evidence.add", "evidence", ev.id);
-        return ev;
+        await touch(tx, assessmentId);
+        await audit(tx, "evidence.add", "evidence", ev.id, { controlId });
+        return { ...ev, controlId };
       });
     },
 

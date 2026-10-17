@@ -13,6 +13,10 @@
     "./password": {
       "types": "./dist/password.d.ts",
       "default": "./dist/password.js"
+    },
+    "./maturity": {
+      "types": "./dist/maturity.d.ts",
+      "default": "./dist/maturity.js"
     }
   },
   "scripts": {
