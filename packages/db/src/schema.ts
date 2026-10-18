@@ -133,6 +133,11 @@ export const sessions = pgTable(
     tokenHash: text("token_hash").notNull().unique(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    // Para que la persona reconozca sus sesiones (solo ella las ve). Se borran al vencer.
+    userAgent: text("user_agent"),
+    ipAddress: text("ip_address"),
+    /** Última actividad, actualizada como mucho cada pocos minutos (no en cada petición). */
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("sessions_user_idx").on(t.userId),

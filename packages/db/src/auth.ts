@@ -93,7 +93,14 @@ export async function getLoginMembership(db: Db, userId: string) {
 /** Crea la sesión y recuerda su organización para el próximo inicio de sesión. */
 export async function createSession(
   db: Db,
-  input: { userId: string; organizationId: string; tokenHash: string; expiresAt: Date },
+  input: {
+    userId: string;
+    organizationId: string;
+    tokenHash: string;
+    expiresAt: Date;
+    userAgent?: string | null;
+    ipAddress?: string | null;
+  },
 ) {
   return db.transaction(async (tx) => {
     const [row] = await tx.insert(sessions).values(input).returning();
@@ -115,6 +122,7 @@ export async function findActiveSession(db: Db, tokenHash: string) {
       organizationId: sessions.organizationId,
       role: memberships.role,
       expiresAt: sessions.expiresAt,
+      lastSeenAt: sessions.lastSeenAt,
       userMfaEnabled: sql<boolean>`${users.mfaEnabledAt} is not null`,
       userEmailVerified: sql<boolean>`${users.emailVerifiedAt} is not null`,
       organizationRequiresMfa: organizations.requireMfa,
@@ -130,6 +138,57 @@ export async function findActiveSession(db: Db, tokenHash: string) {
   return row ?? null;
 }
 
+/** Minutos entre actualizaciones de la última actividad: evita una escritura por petición. */
+export const SESSION_ACTIVITY_MINUTES = 5;
+
+/**
+ * Registra actividad de la sesión si la última es más vieja que SESSION_ACTIVITY_MINUTES.
+ * Condicional en la base: peticiones simultáneas no escriben de más.
+ */
+export async function touchSession(db: Db, session: { sessionId: string; lastSeenAt: Date }, now = new Date()) {
+  if (now.getTime() - session.lastSeenAt.getTime() < SESSION_ACTIVITY_MINUTES * 60_000) return;
+  await db
+    .update(sessions)
+    .set({ lastSeenAt: sql`now()` })
+    .where(
+      and(
+        eq(sessions.id, session.sessionId),
+        lt(sessions.lastSeenAt, sql`now() - make_interval(mins => ${SESSION_ACTIVITY_MINUTES})`),
+      ),
+    );
+}
+
+/**
+ * Sesiones vigentes de la cuenta, en todas sus organizaciones (la persona solo ve
+ * las propias). Nunca devuelve el hash del token.
+ */
+export async function listSessionsForUser(db: Db, userId: string) {
+  return db
+    .select({
+      id: sessions.id,
+      organizationId: sessions.organizationId,
+      organizationName: organizations.name,
+      userAgent: sessions.userAgent,
+      ipAddress: sessions.ipAddress,
+      createdAt: sessions.createdAt,
+      lastSeenAt: sessions.lastSeenAt,
+      expiresAt: sessions.expiresAt,
+    })
+    .from(sessions)
+    .innerJoin(organizations, eq(organizations.id, sessions.organizationId))
+    .where(and(eq(sessions.userId, userId), gt(sessions.expiresAt, sql`now()`)))
+    .orderBy(desc(sessions.lastSeenAt));
+}
+
+/** Cierra UNA sesión de la cuenta. Devuelve su organización, o null si no era suya o no existe. */
+export async function deleteSessionOfUser(db: Db, userId: string, sessionId: string) {
+  const [row] = await db
+    .delete(sessions)
+    .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId)))
+    .returning({ organizationId: sessions.organizationId });
+  return row ?? null;
+}
+
 export async function deleteSession(db: Db, tokenHash: string) {
   await db.delete(sessions).where(eq(sessions.tokenHash, tokenHash));
 }
@@ -138,9 +197,13 @@ export async function deleteSessionsForUser(db: Db, userId: string) {
   await db.delete(sessions).where(eq(sessions.userId, userId));
 }
 
-/** Cierra todas las sesiones del usuario salvo la indicada (p. ej. al activar MFA). */
+/** Cierra todas las sesiones del usuario salvo la indicada (p. ej. al activar MFA). Devuelve cuántas cerró. */
 export async function deleteOtherSessionsForUser(db: Db, userId: string, keepTokenHash: string) {
-  await db.delete(sessions).where(and(eq(sessions.userId, userId), ne(sessions.tokenHash, keepTokenHash)));
+  const closed = await db
+    .delete(sessions)
+    .where(and(eq(sessions.userId, userId), ne(sessions.tokenHash, keepTokenHash)))
+    .returning({ id: sessions.id });
+  return closed.length;
 }
 
 export async function deleteExpiredSessions(db: Db) {

@@ -82,7 +82,7 @@ export async function authRoutes(
         passwordHash: await hashPassword(body.password),
         organizationName: body.organizationName,
       });
-      await startSession(db, reply, { userId: user.id, organizationId: organization.id, secureCookies });
+      await startSession(db, req, reply, { userId: user.id, organizationId: organization.id, secureCookies });
       // Puede usar la cuenta ya; algunas acciones (invitar) esperan a que confirme el email.
       await sendEmailVerification({ db, mailer, log: req.log, appUrl }, user);
       return reply.code(201).send({
@@ -127,7 +127,7 @@ export async function authRoutes(
     }
 
     await clearLoginFailures(db, user.id);
-    await startSession(db, reply, { userId: user.id, organizationId: membership.organizationId, secureCookies });
+    await startSession(db, req, reply, { userId: user.id, organizationId: membership.organizationId, secureCookies });
     await forOrganization(db, membership.organizationId, user.id).record("auth.login", "user", user.id);
     return {
       user: { id: user.id, email: user.email, name: user.name },

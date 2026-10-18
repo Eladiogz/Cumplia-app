@@ -172,7 +172,7 @@ export async function mfaRoutes(
 
     await deleteMfaChallenge(db, challenge.id);
     await clearLoginFailures(db, user.id);
-    await startSession(db, reply, { userId: user.id, organizationId: challenge.organizationId, secureCookies });
+    await startSession(db, req, reply, { userId: user.id, organizationId: challenge.organizationId, secureCookies });
     reply.clearCookie(MFA_CHALLENGE_COOKIE, { path: mfaCookiePath });
     const remaining = method === "recovery" ? await countUnusedRecoveryCodes(db, user.id) : null;
     if (remaining !== null) {

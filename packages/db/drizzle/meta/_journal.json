@@ -99,6 +99,13 @@
       "when": 1792335056832,
       "tag": "0013_risk_register",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792351421175,
+      "tag": "0014_session_details",
+      "breakpoints": true
     }
   ]
 }
