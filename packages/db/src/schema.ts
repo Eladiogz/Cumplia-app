@@ -296,6 +296,28 @@ export const risks = pgTable(
   ],
 );
 
+/**
+ * Cola de emails salientes: se guardan antes de enviarse y un proceso de la API
+ * los entrega con reintentos. `payload` va CIFRADO (lleva links con tokens) y se
+ * borra al enviarse: la fila enviada desaparece; la que falla definitivamente
+ * queda sin contenido, solo con el error.
+ */
+export const emailOutbox = pgTable(
+  "email_outbox",
+  {
+    id: uuid("id").primaryKey(),
+    payload: text("payload"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Reservado por un proceso hasta este momento (varias instancias de la API no duplican envíos). */
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+  },
+  (t) => [index("email_outbox_due_idx").on(t.nextAttemptAt)],
+);
+
 export const auditLogs = pgTable(
   "audit_logs",
   {
