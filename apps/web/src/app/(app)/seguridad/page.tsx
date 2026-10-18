@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import QRCode from "qrcode";
 import { KeyRound, ShieldCheck, ShieldOff } from "lucide-react";
+import { ActiveSessions } from "@/components/active-sessions";
 import { Field, FormError, FormSuccess } from "@/components/form";
 import { PageHeader } from "@/components/page-header";
 import { NewPasswordField } from "@/components/password-field";
@@ -19,10 +20,11 @@ export default function SecurityPage() {
   const { me } = useMe();
   return (
     <>
-      <PageHeader title="Seguridad" description="Tu contraseña y la verificación en dos pasos (MFA)." />
+      <PageHeader title="Seguridad" description="Tu contraseña, la verificación en dos pasos (MFA) y dónde está abierta tu cuenta." />
       <div className="grid gap-4">
         {me.mfaEnabled ? <MfaEnabled /> : <MfaSetup />}
         {!me.mfaSetupRequired && <ChangePassword />}
+        <ActiveSessions />
       </div>
     </>
   );

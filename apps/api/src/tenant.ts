@@ -1,6 +1,6 @@
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
-import { findActiveSession, organizationExists, type Db, type Role } from "@cumplia/db";
+import { findActiveSession, organizationExists, touchSession, type Db, type Role } from "@cumplia/db";
 import { SESSION_COOKIE, hashToken } from "./security/session.js";
 
 /** Quién hace la petición y en nombre de qué organización. */
@@ -35,6 +35,7 @@ export function createSessionTenantResolver(db: Db): TenantResolver {
     if (!token) return null;
     const session = await findActiveSession(db, hashToken(token));
     if (!session) return null;
+    await touchSession(db, session);
     return {
       organizationId: session.organizationId,
       actorId: session.userId,

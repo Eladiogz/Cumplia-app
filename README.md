@@ -128,6 +128,11 @@ Rutas de la cuenta (no dependen de la organización activa):
 | POST | `/auth/invitations/accept` | Con sesión: la cuenta se une y pasa a esa organización. Sin sesión: `{ token, password, name? }` crea la cuenta |
 | GET | `/auth/organizations` | Organizaciones del usuario, con la activa marcada |
 | POST | `/auth/switch-organization` | `{ organizationId }` cambia la organización activa |
+| GET | `/auth/sessions` | Sesiones abiertas de la propia cuenta (todas sus organizaciones): navegador, IP, inicio y última actividad; marca la actual |
+| DELETE | `/auth/sessions/:sessionId` | Cierra una sesión propia (la de otra cuenta responde 404) |
+| POST | `/auth/sessions/revoke-others` | Cierra todas las sesiones menos la actual |
+
+- **Sesiones activas** (Seguridad → Sesiones activas): cada sesión guarda el navegador (`user-agent`) y la IP con que se abrió, y su última actividad, que se actualiza **como mucho cada 5 minutos** (no una escritura por petición). Solo la propia persona las ve; se borran al vencer. Cerrar una o todas queda en la auditoría (`auth.session_closed`, `auth.other_sessions_closed`).
 
 - La invitación vence a los 7 días, sirve una vez y en la base solo queda el hash del token. Reinvitar al mismo email invalida el link anterior.
 - El email lo fija la invitación: un link reenviado no sirve para otra cuenta. Si el email ya tiene cuenta, hay que iniciar sesión para aceptar (se respetan su contraseña y su MFA).
