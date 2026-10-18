@@ -44,6 +44,14 @@
   --chart-target: #0b0b0b;
   /* Estado "serio/alto" (entre advertencia y crítico): siempre con ícono + etiqueta. */
   --serious: #c2410c;
+  /*
+   * Mapa de calor de riesgos: fondos suaves por nivel (texto oscuro encima, contraste
+   * alto). El nivel siempre se escribe en la celda: el color nunca es la única señal.
+   */
+  --risk-low: #dcefd8;
+  --risk-medium: #fbeebb;
+  --risk-high: #f9d3b4;
+  --risk-critical: #f3bcbc;
 }
 
 @theme inline {

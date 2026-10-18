@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { Building2, Check, ChevronsUpDown, ClipboardList, Home, LogOut, MailWarning, ShieldCheck, ShieldAlert } from "lucide-react";
+import { Building2, Check, ChevronsUpDown, ClipboardList, Gauge, Home, LogOut, MailWarning, ShieldCheck, ShieldAlert } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/", label: "Inicio", icon: Home },
   { href: "/evaluaciones", label: "Evaluaciones", icon: ClipboardList },
+  { href: "/riesgos", label: "Riesgos", icon: Gauge },
   { href: "/organizacion", label: "Organización", icon: Building2 },
   { href: "/seguridad", label: "Seguridad", icon: ShieldCheck },
 ] as const;

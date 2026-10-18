@@ -17,26 +17,10 @@ import {
   type AuditDetails,
 } from "./schema.js";
 
-export class NotFoundError extends Error {
-  constructor(what: string) {
-    super(`${what} no encontrado`);
-    this.name = "NotFoundError";
-  }
-}
+import { ConflictError, NotFoundError, ValidationError } from "./errors.js";
+import { riskMethods } from "./risks.js";
 
-export class ValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ValidationError";
-  }
-}
-
-export class ConflictError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ConflictError";
-  }
-}
+export { ConflictError, NotFoundError, ValidationError };
 
 export async function organizationExists(db: Db, organizationId: string) {
   const [row] = await db
@@ -143,6 +127,8 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
   };
 
   return {
+    ...riskMethods({ organizationId, inTenant, audit }),
+
     async createAssessment(frameworkId: string, targetMaturity = 3, name?: string) {
       try {
         loadFramework(frameworkId); // valida que exista

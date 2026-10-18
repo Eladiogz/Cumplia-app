@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  date,
   foreignKey,
   index,
   integer,
@@ -240,6 +241,54 @@ export const invitations = pgTable(
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
   },
   (t) => [index("invitations_org_idx").on(t.organizationId)],
+);
+
+export const riskTreatmentEnum = pgEnum("risk_treatment", ["mitigate", "accept", "transfer", "avoid"]);
+export const riskStatusEnum = pgEnum("risk_status", ["identified", "in_treatment", "accepted", "closed"]);
+
+/**
+ * Registro de riesgos de la organización (ISO/IEC 27001 6.1.2 y 6.1.3), matriz 5×5.
+ * El responsable (owner_id) tiene FK compuesta a la MEMBRESÍA (ver migración 0013):
+ * solo puede ser alguien de esta organización y, si lo quitan, queda en nulo.
+ */
+export const risks = pgTable(
+  "risks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull().references(() => organizations.id),
+    /** Correlativo por organización: R-001, R-002… */
+    number: integer("number").notNull(),
+    title: text("title").notNull(),
+    description: text("description"),
+    asset: text("asset"),
+    threat: text("threat"),
+    likelihood: integer("likelihood").notNull(),
+    impact: integer("impact").notNull(),
+    treatment: riskTreatmentEnum("treatment").notNull().default("mitigate"),
+    treatmentPlan: text("treatment_plan"),
+    /** Controles del Anexo A que tratan el riesgo (p. ej. "A.8.5"). */
+    controlIds: text("control_ids").array().notNull().default(sql`'{}'::text[]`),
+    residualLikelihood: integer("residual_likelihood"),
+    residualImpact: integer("residual_impact"),
+    status: riskStatusEnum("status").notNull().default("identified"),
+    ownerId: uuid("owner_id"),
+    dueDate: date("due_date"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("risks_org_number_uq").on(t.organizationId, t.number),
+    index("risks_org_idx").on(t.organizationId),
+    check("risks_title_length", sql`char_length(${t.title}) between 1 and 200`),
+    check("risks_likelihood_range", sql`${t.likelihood} between 1 and 5`),
+    check("risks_impact_range", sql`${t.impact} between 1 and 5`),
+    check(
+      "risks_residual_pair",
+      sql`(${t.residualLikelihood} is null) = (${t.residualImpact} is null)
+          and (${t.residualLikelihood} is null or ${t.residualLikelihood} between 1 and 5)
+          and (${t.residualImpact} is null or ${t.residualImpact} between 1 and 5)`,
+    ),
+  ],
 );
 
 export const auditLogs = pgTable(

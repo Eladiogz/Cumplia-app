@@ -1,5 +1,6 @@
 export * from "./client.js";
 export * from "./repository.js";
+export { RISK_CONTROL_FRAMEWORK, type RiskInput } from "./risks.js";
 export * from "./auth.js";
 export * from "./mfa.js";
 export * from "./invitations.js";

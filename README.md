@@ -4,7 +4,7 @@
 
 ## Estado: Fases 1, 2A y 2B completas · Fase 3 (aplicación web) en curso
 - Monorepo TypeScript (pnpm): `apps/api`, `apps/web`, `packages/frameworks`, `packages/core`, `packages/db`
-- `apps/web`: Next.js + Tailwind + componentes estilo shadcn/ui. Ingreso, registro, verificación en dos pasos, recuperación de contraseña, invitaciones, selector de organización, seguridad, organización y el **asistente de evaluación**: los 93 controles por dominio, aplica/no aplica (con justificación obligatoria), madurez 0-4 con descripción de cada nivel, notas, evidencia, avance por dominio y guardado automático (ADMIN y CONSULTANT editan; AUDITOR ve en modo lectura)
+- `apps/web`: Next.js + Tailwind + componentes estilo shadcn/ui. Ingreso, registro, verificación en dos pasos, recuperación de contraseña, invitaciones, selector de organización, seguridad, organización y el **asistente de evaluación**: los 93 controles por dominio, aplica/no aplica (con justificación obligatoria), madurez 0-4 con descripción de cada nivel, notas, evidencia, avance por dominio y guardado automático (ADMIN y CONSULTANT editan; AUDITOR ve en modo lectura), tablero de resultados, exportación de la SoA y el **registro de riesgos** con mapa de calor
 - Los 93 controles del Anexo A de ISO/IEC 27001:2022 como datos versionados
 - Motor de puntaje de madurez (escala 0-4), brechas priorizadas y Declaración de Aplicabilidad (SoA)
 - API Fastify con helmet y rate limit
@@ -15,7 +15,7 @@
 ### Multi-tenant: cómo se aíslan las organizaciones
 1. **Código**: todo acceso a datos de negocio pasa por `forOrganization(db, orgId)`; un recurso ajeno responde 404 (no revela que existe).
 2. **Base de datos**: FK compuestas `(id, organization_id)` entre evaluaciones, respuestas y evidencia; sesiones y desafíos MFA atados a la membresía `(user_id, organization_id)`. La base rechaza cualquier fila que mezcle organizaciones.
-3. **Row-Level Security**: en `assessments`, `control_answers`, `evidence`, `invitations` y `audit_logs`, Postgres solo devuelve y deja escribir filas de la organización fijada en la transacción (`forOrganization` lo hace siempre). Sin organización activa: ninguna fila. La API se conecta con un usuario del rol `cumplia_app`, sin privilegios de dueño; **en producción se niega a arrancar** si la conexión se saltearía RLS (superusuario, `BYPASSRLS` o dueño).
+3. **Row-Level Security**: en `assessments`, `control_answers`, `evidence`, `invitations`, `risks` y `audit_logs`, Postgres solo devuelve y deja escribir filas de la organización fijada en la transacción (`forOrganization` lo hace siempre). Sin organización activa: ninguna fila. La API se conecta con un usuario del rol `cumplia_app`, sin privilegios de dueño; **en producción se niega a arrancar** si la conexión se saltearía RLS (superusuario, `BYPASSRLS` o dueño).
 4. **Auditoría inalterable**: un trigger impide `UPDATE`, `DELETE` y `TRUNCATE` sobre `audit_logs`, y el rol de la API ni siquiera tiene esos permisos.
 5. **Tests que se mantienen solos**: `tenant-isolation.test.ts` descubre todas las rutas protegidas y verifica que una organización no pueda leer ni modificar datos de otra; otro test exige RLS en toda tabla nueva con `organization_id`. Todos los tests corren con el mismo rol que la API.
 
@@ -72,6 +72,30 @@ Rutas por organización (requieren sesión; sin ella responden 401, sin el rol n
 | POST | `/assessments/:id/evidence/files` | Evidencia con archivo (multipart: `controlId`, `description` opcional, `file`) | ADMIN, CONSULTANT |
 | GET | `/assessments/:id/evidence/:evidenceId/file` | Ver o descargar el archivo | todos |
 | DELETE | `/assessments/:id/evidence/:evidenceId` | Borrar evidencia (queda en la auditoría) | ADMIN, CONSULTANT |
+| GET · PUT | `/assessments/:id/answers` | Leer (todos) y guardar (ADMIN, CONSULTANT) respuestas | — |
+| GET | `/assessments/:id/result` · `/soa` | Puntaje y Declaración de Aplicabilidad | todos |
+| POST | `/assessments/:id/evidence` | Registrar evidencia de un control | ADMIN, CONSULTANT |
+| GET | `/audit-log` | Registro de auditoría | ADMIN, AUDITOR |
+| GET | `/organization` | Datos y políticas de la organización | todos |
+| PATCH | `/organization` | Cambiar nombre o exigir MFA (`requireMfa`) | ADMIN |
+| GET | `/members` | Miembros, rol y si tienen MFA (revisión de accesos) | ADMIN, AUDITOR |
+| PATCH · DELETE | `/members/:userId` | Cambiar rol o quitar de la organización | ADMIN |
+| POST | `/invitations` | Invitar por email con un rol (el link viaja **solo** por email) | ADMIN |
+| GET | `/invitations` | Invitaciones pendientes | ADMIN, AUDITOR |
+| DELETE | `/invitations/:invitationId` | Revocar una invitación | ADMIN |
+| GET | `/risks` · `/risks/:riskId` | Registro de riesgos | todos |
+| POST · PATCH | `/risks` · `/risks/:riskId` | Registrar y editar riesgos | ADMIN, CONSULTANT |
+| DELETE | `/risks/:riskId` | Borrar un riesgo (queda en la auditoría) | ADMIN |
+| GET | `/risks/owners` | Miembros asignables como responsables | ADMIN, CONSULTANT |
+| GET | `/risks.xlsx` | Registro en Excel: Resumen (con la matriz) y Riesgos (filtrable) | todos, con email verificado |
+
+### Registro de riesgos (`/riesgos`)
+Evaluación y tratamiento de riesgos (ISO/IEC 27001 cláusulas 6.1.2 y 6.1.3):
+- **Matriz 5×5**: probabilidad (Rara → Casi segura) × impacto (Insignificante → Catastrófico). Puntaje 1-25 → **Bajo** ≤ 4 · **Medio** ≤ 9 · **Alto** ≤ 16 · **Crítico** > 16. Las reglas viven en `@cumplia/core/risk` y las comparten la API y la web.
+- Cada riesgo: código correlativo por organización (R-001…), activo, amenaza, tratamiento (mitigar, aceptar, transferir, evitar) con su plan, controles del Anexo A, **riesgo residual**, estado, responsable y fecha límite.
+- **Aceptar exige justificación**, y el estado *Aceptado* solo vale con tratamiento *Aceptar*. Se valida sobre el resultado de cada cambio (también en un PATCH parcial).
+- El responsable tiene FK compuesta a la **membresía** de la misma organización: no se puede asignar a alguien de otra, y si deja la organización el riesgo queda sin responsable (`ON DELETE SET NULL (owner_id)`, PostgreSQL 15+).
+- La web muestra un **mapa de calor** (inherente/residual; tooltip con mouse y teclado; clic en una celda para filtrar; vista de tabla), los niveles con ícono + etiqueta, y marca los riesgos abiertos con la fecha límite vencida.
 
 ### Resultado y tablero (`/evaluaciones/:id/resultado`)
 `GET /assessments/:id/result` devuelve: puntaje general y madurez promedio **sobre lo ya evaluado** (los pendientes no cuentan como 0; `coverage` dice cuánto se evaluó), controles que alcanzan el objetivo, distribución por nivel 0-4, puntaje/promedio por dominio y brechas con su dominio y tamaño, **ordenadas de la más grande a la más chica**.
@@ -94,17 +118,6 @@ La web lo muestra como cifra principal + indicadores, madurez por dominio (barra
 - La clave de cada archivo la arma la API bajo `org/<organización>/…`; el nombre del usuario solo se muestra (saneado).
 - Cada archivo guarda su **huella SHA-256**: permite demostrar ante un auditor que no cambió desde que se cargó.
 - Solo se descargan **a través de la API** (que verifica organización y rol), con `nosniff`, CSP `sandbox` y sin caché compartida.
-| GET · PUT | `/assessments/:id/answers` | Leer (todos) y guardar (ADMIN, CONSULTANT) respuestas | — |
-| GET | `/assessments/:id/result` · `/soa` | Puntaje y Declaración de Aplicabilidad | todos |
-| POST | `/assessments/:id/evidence` | Registrar evidencia de un control | ADMIN, CONSULTANT |
-| GET | `/audit-log` | Registro de auditoría | ADMIN, AUDITOR |
-| GET | `/organization` | Datos y políticas de la organización | todos |
-| PATCH | `/organization` | Cambiar nombre o exigir MFA (`requireMfa`) | ADMIN |
-| GET | `/members` | Miembros, rol y si tienen MFA (revisión de accesos) | ADMIN, AUDITOR |
-| PATCH · DELETE | `/members/:userId` | Cambiar rol o quitar de la organización | ADMIN |
-| POST | `/invitations` | Invitar por email con un rol (el link viaja **solo** por email) | ADMIN |
-| GET | `/invitations` | Invitaciones pendientes | ADMIN, AUDITOR |
-| DELETE | `/invitations/:invitationId` | Revocar una invitación | ADMIN |
 
 ### Invitaciones y organización activa
 Rutas de la cuenta (no dependen de la organización activa):

@@ -1,27 +1,6 @@
-import writeXlsxFile, { type CellObject, type Row, type Sheet } from "write-excel-file/node";
+import writeXlsxFile, { type Row, type Sheet } from "write-excel-file/node";
 import { COPYRIGHT_NOTE, implementationStatus, summaryRows, type SoaReport } from "./soa-data.js";
-
-// Los textos de usuarios (justificaciones) se escriben como celdas de TEXTO: nunca se
-// interpretan como fórmulas aunque empiecen con "=" (sin riesgo de inyección de fórmulas).
-
-const NAVY = "#1F3A5F";
-const header = (value: string): CellObject => ({
-  value,
-  type: String,
-  fontWeight: "bold",
-  textColor: "#FFFFFF",
-  backgroundColor: NAVY,
-  alignVertical: "center",
-  wrap: true,
-});
-const text = (value: string, extra: Partial<CellObject> = {}): CellObject => ({
-  value,
-  type: String,
-  alignVertical: "top",
-  wrap: true,
-  ...extra,
-});
-const num = (value: number): CellObject => ({ value, type: Number, alignVertical: "top", align: "right" });
+import { header, num, text } from "./xlsx-cells.js";
 
 /** Excel de la SoA: Resumen, Declaración de Aplicabilidad (tabla filtrable) y Brechas. */
 export async function soaToXlsx(report: SoaReport): Promise<Buffer> {

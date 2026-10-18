@@ -17,3 +17,5 @@ export const ROLE_DESCRIPTION: Record<Role, string> = {
 export const canManageMembers = (role: Role) => role === "ADMIN";
 export const canSeeMembers = (role: Role) => role === "ADMIN" || role === "AUDITOR";
 export const canEditAssessments = (role: Role) => role === "ADMIN" || role === "CONSULTANT";
+export const canEditRisks = (role: Role) => role === "ADMIN" || role === "CONSULTANT";
+export const canDeleteRisks = (role: Role) => role === "ADMIN";
