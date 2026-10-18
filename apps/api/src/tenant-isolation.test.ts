@@ -21,7 +21,7 @@ const routes: { method: string; url: string }[] = [];
 const PASSWORD = "Clave-Segura-de-Prueba-2026";
 
 // Datos de la organización A que B nunca debe ver ni tocar.
-const A = { orgId: "", assessmentId: "", memberId: "", memberEmail: "", adminEmail: "", invitationId: "", invitedEmail: "", evidenceId: "" };
+const A = { orgId: "", assessmentId: "", memberId: "", memberEmail: "", adminEmail: "", invitationId: "", invitedEmail: "", evidenceId: "", riskId: "" };
 let cookieA = "";
 let cookieB = "";
 
@@ -31,6 +31,7 @@ const PARAMS: Record<string, () => string> = {
   userId: () => A.memberId,
   invitationId: () => A.invitationId,
   evidenceId: () => A.evidenceId,
+  riskId: () => A.riskId,
 };
 
 /** Cuerpos válidos: así la petición llega hasta la verificación de pertenencia (y no muere en un 400). */
@@ -42,6 +43,7 @@ const BODIES: Record<string, object> = {
   "PATCH /members/:userId": { role: "AUDITOR" },
   "POST /members/:userId/password-reset": {},
   "POST /members/:userId/sessions/revoke": {},
+  "PATCH /risks/:riskId": { status: "closed" },
 };
 
 const register = async (email: string, organizationName: string) => {
@@ -98,6 +100,8 @@ beforeAll(async () => {
   });
   A.invitationId = invitation.id;
 
+  A.riskId = (await repoA.createRisk({ title: "Riesgo secreto de A", likelihood: 4, impact: 5, ownerId: A.memberId })).id;
+
   cookieB = (await register("admin-b@ejemplo.com", "Organización B")).cookie;
 });
 afterAll(async () => {
@@ -130,7 +134,7 @@ describe("aislamiento entre organizaciones en todas las rutas protegidas", () =>
   });
 
   it("los listados de B no contienen nada de A", async () => {
-    const secrets = [A.orgId, A.assessmentId, A.memberId, A.memberEmail, A.adminEmail, A.invitationId, A.invitedEmail, "evidencia de A"];
+    const secrets = [A.orgId, A.assessmentId, A.memberId, A.memberEmail, A.adminEmail, A.invitationId, A.invitedEmail, "evidencia de A", A.riskId, "Riesgo secreto de A"];
     for (const { url } of routes.filter((r) => r.method === "GET" && !r.url.includes(":"))) {
       const res = await call("GET", url, cookieB);
       expect(res.statusCode, url).toBe(200);
@@ -148,7 +152,9 @@ describe("aislamiento entre organizaciones en todas las rutas protegidas", () =>
     for (const action of ["invitation.revoke", "member.password_reset_sent", "member.sessions_revoked", "member.mfa_reset"]) {
       expect(log.map((l) => l.action)).not.toContain(action);
     }
-    const pendingInvitations = (await call("GET", "/invitations", cookieA)).json() as { id: string }[];
+    const risk = (await call("GET", `/risks/${A.riskId}`, cookieA)).json() as { status: string; title: string };
+    expect(risk).toMatchObject({ status: "identified", title: "Riesgo secreto de A" });
+    const pendingInvitations =(await call("GET", "/invitations", cookieA)).json() as { id: string }[];
     expect(pendingInvitations.map((i) => i.id)).toContain(A.invitationId);
   });
 });

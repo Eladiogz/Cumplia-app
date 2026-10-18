@@ -17,6 +17,10 @@
     "./maturity": {
       "types": "./dist/maturity.d.ts",
       "default": "./dist/maturity.js"
+    },
+    "./risk": {
+      "types": "./dist/risk.d.ts",
+      "default": "./dist/risk.js"
     }
   },
   "scripts": {

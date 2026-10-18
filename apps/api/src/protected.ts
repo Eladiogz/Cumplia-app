@@ -5,6 +5,7 @@ import type { ObjectStorage } from "./storage/storage.js";
 import { assessmentRoutes } from "./routes/assessments.js";
 import { invitationRoutes } from "./routes/invitations.js";
 import { organizationRoutes } from "./routes/organization.js";
+import { riskRoutes } from "./routes/risks.js";
 import { can } from "./security/permissions.js";
 import type { TenantResolver } from "./tenant.js";
 
@@ -54,4 +55,5 @@ export async function protectedRoutes(app: FastifyInstance, { db, resolveTenant,
   app.register(assessmentRoutes, { db, storage });
   app.register(organizationRoutes, { db, mailer, appUrl });
   app.register(invitationRoutes, { db, mailer, appUrl });
+  app.register(riskRoutes, { db });
 }

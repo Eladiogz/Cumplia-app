@@ -256,7 +256,7 @@ describe("Row-Level Security", () => {
       join pg_attribute a on a.attrelid = c.oid and a.attname = 'organization_id' and not a.attisdropped
       where c.relkind = 'r'`);
     const tables = result.rows.filter((r) => !identityTables.includes(r.table));
-    expect(tables.map((t) => t.table).sort()).toEqual(["assessments", "audit_logs", "control_answers", "evidence", "invitations"]);
+    expect(tables.map((t) => t.table).sort()).toEqual(["assessments", "audit_logs", "control_answers", "evidence", "invitations", "risks"]);
     for (const t of tables) {
       expect(t, t.table).toMatchObject({ rls: true, forced: true });
       expect(t.policies, t.table).toBeGreaterThanOrEqual(1);

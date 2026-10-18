@@ -7,18 +7,33 @@ export type Permission =
   | "members:manage"
   | "assessment:read"
   | "assessment:write"
+  | "risk:read"
+  | "risk:write"
+  | "risk:delete"
   | "audit:read";
 
 /**
  * Única fuente de verdad de qué puede hacer cada rol. Lo que no figura, se deniega.
  * - ADMIN: todo.
- * - CONSULTANT: trabaja las evaluaciones (respuestas, evidencia); no administra.
+ * - CONSULTANT: trabaja las evaluaciones (respuestas, evidencia) y los riesgos; no
+ *   administra ni borra riesgos (un riesgo borrado deja de verse en el registro).
  * - AUDITOR: solo lectura, incluida la auditoría y la revisión de accesos (ISO A.5.18).
  */
 const MATRIX: Record<Role, readonly Permission[]> = {
-  ADMIN: ["org:read", "org:manage", "members:read", "members:manage", "assessment:read", "assessment:write", "audit:read"],
-  CONSULTANT: ["org:read", "assessment:read", "assessment:write"],
-  AUDITOR: ["org:read", "members:read", "assessment:read", "audit:read"],
+  ADMIN: [
+    "org:read",
+    "org:manage",
+    "members:read",
+    "members:manage",
+    "assessment:read",
+    "assessment:write",
+    "risk:read",
+    "risk:write",
+    "risk:delete",
+    "audit:read",
+  ],
+  CONSULTANT: ["org:read", "assessment:read", "assessment:write", "risk:read", "risk:write"],
+  AUDITOR: ["org:read", "members:read", "assessment:read", "risk:read", "audit:read"],
 };
 
 export const can = (role: Role, permission: Permission) => MATRIX[role].includes(permission);
