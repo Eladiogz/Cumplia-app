@@ -143,6 +143,41 @@ describe("datos para el asistente", () => {
   });
 });
 
+describe("exportar la Declaración de Aplicabilidad", () => {
+  it("PDF y Excel como descarga, con nombre de archivo y registro en la auditoría", async () => {
+    const id = (await call("POST", "/assessments", orgA, { frameworkId: "iso27001-2022", name: "Gap anual" })).json().id;
+    await call("PUT", `/assessments/${id}/answers`, orgA, { answers: [{ controlId: "A.7.1", applicable: false, justification: "Remoto" }] });
+
+    const pdf = await call("GET", `/assessments/${id}/soa.pdf`, orgA);
+    expect(pdf.statusCode).toBe(200);
+    expect(pdf.headers["content-type"]).toBe("application/pdf");
+    expect(pdf.headers["content-disposition"]).toMatch(/^attachment; filename="SoA - Gap anual - \d{4}-\d{2}-\d{2}\.pdf"/);
+    expect(pdf.rawPayload.subarray(0, 5).toString()).toBe("%PDF-");
+
+    const xlsx = await call("GET", `/assessments/${id}/soa.xlsx`, orgA);
+    expect(xlsx.statusCode).toBe(200);
+    expect(xlsx.headers["content-type"]).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    expect(xlsx.rawPayload.subarray(0, 2).toString()).toBe("PK"); // un .xlsx es un ZIP
+
+    const log = (await call("GET", "/audit-log", orgA)).json() as { action: string; details: { format?: string } | null }[];
+    const exports = log.filter((l) => l.action === "soa.export").map((l) => l.details?.format);
+    expect(exports).toEqual(expect.arrayContaining(["pdf", "xlsx"]));
+  });
+
+  it("otra organización no puede exportar, y sin email verificado tampoco", async () => {
+    const id = await createAssessment(orgA);
+    expect((await call("GET", `/assessments/${id}/soa.pdf`, orgB)).statusCode).toBe(404);
+    const unverified = buildApp({
+      db: ctx.db,
+      resolveTenant: () => ({ organizationId: orgA, actorId: null, role: "AUDITOR", mfaEnabled: false, mfaSetupRequired: false, emailVerified: false }),
+    });
+    const res = await unverified.inject({ method: "GET", url: `/assessments/${id}/soa.xlsx` });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("EMAIL_NOT_VERIFIED");
+    await unverified.close();
+  });
+});
+
 describe("aislamiento entre organizaciones por HTTP", () => {
   it("la organización B no accede a datos de A", async () => {
     const id = await createAssessment(orgA);

@@ -7,6 +7,7 @@ import { AlertOctagon, AlertTriangle, ArrowLeft, ArrowRight, CircleAlert, Clipbo
 import { MATURITY_LEVELS } from "@cumplia/core/maturity";
 import { ChartCard, DomainBars, DomainTable, MaturityColumns, MaturityTable, Meter } from "@/components/charts";
 import { FormError, Spinner } from "@/components/form";
+import { SoaExportMenu } from "@/components/soa-export";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,11 +54,14 @@ export default function AssessmentResultPage() {
               ISO/IEC 27001:2022 · Objetivo: {result.targetMaturity} · {target?.label}
             </p>
           </div>
-          <Button asChild variant="outline">
-            <Link href={`/evaluaciones/${id}`}>
-              <ClipboardList aria-hidden /> {canEditAssessments(me.role) ? "Seguir evaluando" : "Ver respuestas"}
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <SoaExportMenu assessmentId={id} size="default" />
+            <Button asChild variant="outline">
+              <Link href={`/evaluaciones/${id}`}>
+                <ClipboardList aria-hidden /> {canEditAssessments(me.role) ? "Seguir evaluando" : "Ver respuestas"}
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
 

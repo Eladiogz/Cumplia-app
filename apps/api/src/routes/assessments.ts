@@ -1,10 +1,14 @@
 import { randomUUID } from "node:crypto";
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { MultipartFields } from "@fastify/multipart";
 import { z } from "zod";
 import { AnswerSchema, buildStatementOfApplicability } from "@cumplia/core";
 import { loadFramework } from "@cumplia/frameworks";
 import { NotFoundError, forOrganization, type Db } from "@cumplia/db";
+import { reportFileName } from "../reports/soa-data.js";
+import { soaToPdf } from "../reports/soa-pdf.js";
+import { buildSoaReport } from "../reports/soa-report.js";
+import { soaToXlsx } from "../reports/soa-xlsx.js";
 import { requires } from "../security/permissions.js";
 import { MAX_EVIDENCE_BYTES, contentDisposition, detectFileType, safeFileName, sha256 } from "../storage/files.js";
 import type { ObjectStorage } from "../storage/storage.js";
@@ -57,6 +61,8 @@ interface Options {
 
 const READ = requires("assessment:read");
 const WRITE = requires("assessment:write");
+const EXPORT = requires("assessment:read", { verifiedEmail: true });
+const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 /** Se registra dentro de protectedRoutes: tenant y permisos ya están verificados. */
 export async function assessmentRoutes(app: FastifyInstance, opts: Options) {
@@ -118,6 +124,24 @@ export async function assessmentRoutes(app: FastifyInstance, opts: Options) {
     if (!found) throw new NotFoundError("Evaluación");
     return buildStatementOfApplicability(loadFramework(found.frameworkId), await r.getAnswers(id));
   });
+
+  /**
+   * Exportar la Declaración de Aplicabilidad. Lectura (también AUDITOR), pero con email
+   * verificado; cada exportación queda en la auditoría.
+   */
+  const exportSoa = (format: "pdf" | "xlsx") => async (req: FastifyRequest, reply: FastifyReply) => {
+    const { id } = IdParams.parse(req.params);
+    const report = await buildSoaReport(opts.db, req.tenant!, id);
+    const body = format === "pdf" ? await soaToPdf(report) : await soaToXlsx(report);
+    await repo(req).record("soa.export", "assessment", id, { format });
+    return reply
+      .header("content-type", format === "pdf" ? "application/pdf" : XLSX_TYPE)
+      .header("content-disposition", contentDisposition(reportFileName(report, format), "attachment"))
+      .header("cache-control", "private, no-store")
+      .send(body);
+  };
+  app.get("/assessments/:id/soa.pdf", EXPORT, exportSoa("pdf"));
+  app.get("/assessments/:id/soa.xlsx", EXPORT, exportSoa("xlsx"));
 
   app.post("/assessments/:id/evidence", WRITE, async (req, reply) => {
     const { id } = IdParams.parse(req.params);

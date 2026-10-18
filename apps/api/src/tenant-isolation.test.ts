@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { forOrganization, schema } from "@cumplia/db";
 import { createTestDb } from "@cumplia/db/testing";
 import { buildApp } from "./app.js";
@@ -46,7 +47,10 @@ const BODIES: Record<string, object> = {
 const register = async (email: string, organizationName: string) => {
   const res = await app.inject({ method: "POST", url: "/auth/register", payload: { email, password: PASSWORD, organizationName } });
   const c = res.cookies.find((x) => x.name === SESSION_COOKIE)!;
-  return { body: res.json() as { user: { id: string }; organization: { id: string } }, cookie: `${SESSION_COOKIE}=${c.value}` };
+  const body = res.json() as { user: { id: string }; organization: { id: string } };
+  // Email verificado: así ninguna ruta corta antes con 403 y se prueba el aislamiento de verdad (404).
+  await ctx.db.update(schema.users).set({ emailVerifiedAt: new Date() }).where(eq(schema.users.id, body.user.id));
+  return { body, cookie: `${SESSION_COOKIE}=${c.value}` };
 };
 
 const call = (method: string, url: string, cookie: string, payload?: object) =>
