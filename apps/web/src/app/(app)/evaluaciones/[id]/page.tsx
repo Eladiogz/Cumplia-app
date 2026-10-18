@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
-import { AlertCircle, ArrowLeft, Check, ChevronDown, CircleDashed, FileText, Loader2, Pencil, SkipForward } from "lucide-react";
+import { AlertCircle, ArrowLeft, BarChart3, Check, ChevronDown, CircleDashed, FileText, Loader2, Pencil, SkipForward } from "lucide-react";
 import { MATURITY_LEVELS } from "@cumplia/core/maturity";
 import { EvidenceSection } from "@/components/evidence-section";
 import { Field, FormError, Spinner } from "@/components/form";
@@ -53,8 +53,17 @@ export default function AssessmentWizardPage() {
         setAnswers(new Map(list.map((x) => [x.controlId, x])));
         setStored(new Set(list.map((x) => x.controlId)));
         setEvidence(ev);
+        // ?control=A.5.1 (p. ej. desde las brechas del resultado) abre ese control; si no, el primer pendiente.
+        const requested = fw.controls.find((c) => c.id === new URLSearchParams(window.location.search).get("control"));
         const firstPending = nextPending(fw.controls, new Map(list.map((x) => [x.controlId, x])), null);
-        setDomain(firstPending?.domain ?? Object.keys(fw.domains)[0] ?? "");
+        const start = requested ?? firstPending;
+        setDomain(start?.domain ?? Object.keys(fw.domains)[0] ?? "");
+        if (requested) {
+          setOpenId(requested.id);
+          requestAnimationFrame(() =>
+            document.getElementById(`control-${requested.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }),
+          );
+        }
       } catch (e) {
         setLoadError(errorMessage(e));
       }
@@ -347,11 +356,18 @@ function AssessmentHeader({
               {readOnly && " · Solo lectura"}
             </p>
           </div>
-          {!readOnly && (
-            <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
-              <Pencil aria-hidden /> Editar datos
+          <div className="flex flex-wrap gap-2">
+            {!readOnly && (
+              <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+                <Pencil aria-hidden /> Editar datos
+              </Button>
+            )}
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/evaluaciones/${assessment.id}/resultado`}>
+                <BarChart3 aria-hidden /> Ver resultado
+              </Link>
             </Button>
-          )}
+          </div>
         </div>
       )}
     </div>

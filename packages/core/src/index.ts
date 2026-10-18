@@ -23,28 +23,52 @@ export interface DomainScore {
   label: string;
   applicable: number;
   assessed: number;
-  score: number; // 0-100
+  /** 0-100 sobre los controles YA evaluados del dominio. */
+  score: number;
+  /** Madurez promedio 0-4 de lo evaluado (null si no hay nada evaluado). */
+  average: number | null;
+  /** Controles evaluados con madurez >= objetivo. */
+  meetingTarget: number;
 }
 
 export interface Gap {
   controlId: string;
   title: string;
+  domain: string;
   maturity: number;
   target: number;
+  /** Niveles que faltan para el objetivo (prioridad: mayor brecha primero). */
+  gap: number;
 }
 
 export interface AssessmentResult {
   frameworkId: string;
-  overallScore: number; // 0-100
+  targetMaturity: number;
+  /**
+   * 0-100 sobre los controles ya evaluados. Los pendientes NO cuentan como 0:
+   * mientras falten controles el resultado es parcial (ver `coverage`).
+   */
+  overallScore: number;
+  /** Madurez promedio 0-4 de lo evaluado (null si no hay nada evaluado). */
+  averageMaturity: number | null;
+  /** % de los controles aplicables que ya tienen madurez. */
+  coverage: number;
   applicable: number;
   notApplicable: number;
-  pending: number; // aplicables sin evaluar
+  /** Aplicables sin evaluar. */
+  pending: number;
+  /** Evaluados con madurez >= objetivo. */
+  meetingTarget: number;
+  /** Cantidad de controles evaluados en cada nivel 0..4. */
+  distribution: [number, number, number, number, number];
   byDomain: DomainScore[];
-  gaps: Gap[]; // ordenadas de menor a mayor madurez
+  /** Ordenadas por brecha (mayor primero) y luego por control. */
+  gaps: Gap[];
 }
 
 const pct = (value: number, max: number) =>
   max === 0 ? 0 : Math.round((value / max) * 1000) / 10;
+const oneDecimal = (value: number) => Math.round(value * 10) / 10;
 
 export function scoreAssessment(
   framework: Framework,
@@ -63,13 +87,16 @@ export function scoreAssessment(
   let applicable = 0;
   let notApplicable = 0;
   let pending = 0;
+  let assessed = 0;
   let total = 0;
+  let meetingTarget = 0;
+  const distribution: [number, number, number, number, number] = [0, 0, 0, 0, 0];
   const gaps: Gap[] = [];
-  const acc = new Map<string, { applicable: number; assessed: number; sum: number }>();
+  const acc = new Map<string, { applicable: number; assessed: number; sum: number; meetingTarget: number }>();
 
   for (const control of framework.controls) {
     const a = answers.get(control.id);
-    const d = acc.get(control.domain) ?? { applicable: 0, assessed: 0, sum: 0 };
+    const d = acc.get(control.domain) ?? { applicable: 0, assessed: 0, sum: 0, meetingTarget: 0 };
     acc.set(control.domain, d);
 
     if (a && !a.applicable) {
@@ -82,27 +109,52 @@ export function scoreAssessment(
       pending++;
       continue;
     }
+    assessed++;
     d.assessed++;
     d.sum += a.maturity;
     total += a.maturity;
-    if (a.maturity < targetMaturity) {
-      gaps.push({ controlId: control.id, title: control.title, maturity: a.maturity, target: targetMaturity });
+    distribution[a.maturity as 0 | 1 | 2 | 3 | 4]++;
+    if (a.maturity >= targetMaturity) {
+      meetingTarget++;
+      d.meetingTarget++;
+    } else {
+      gaps.push({
+        controlId: control.id,
+        title: control.title,
+        domain: control.domain,
+        maturity: a.maturity,
+        target: targetMaturity,
+        gap: targetMaturity - a.maturity,
+      });
     }
   }
 
   const byDomain: DomainScore[] = Object.entries(framework.domains).map(([domain, label]) => {
-    const d = acc.get(domain) ?? { applicable: 0, assessed: 0, sum: 0 };
-    return { domain, label, applicable: d.applicable, assessed: d.assessed, score: pct(d.sum, d.applicable * 4) };
+    const d = acc.get(domain) ?? { applicable: 0, assessed: 0, sum: 0, meetingTarget: 0 };
+    return {
+      domain,
+      label,
+      applicable: d.applicable,
+      assessed: d.assessed,
+      score: pct(d.sum, d.assessed * 4),
+      average: d.assessed ? oneDecimal(d.sum / d.assessed) : null,
+      meetingTarget: d.meetingTarget,
+    };
   });
 
-  gaps.sort((x, y) => x.maturity - y.maturity || x.controlId.localeCompare(y.controlId, undefined, { numeric: true }));
+  gaps.sort((x, y) => y.gap - x.gap || x.controlId.localeCompare(y.controlId, undefined, { numeric: true }));
 
   return {
     frameworkId: framework.id,
-    overallScore: pct(total, applicable * 4),
+    targetMaturity,
+    overallScore: pct(total, assessed * 4),
+    averageMaturity: assessed ? oneDecimal(total / assessed) : null,
+    coverage: pct(assessed, applicable),
     applicable,
     notApplicable,
     pending,
+    meetingTarget,
+    distribution,
     byDomain,
     gaps,
   };
