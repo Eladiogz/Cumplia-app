@@ -73,6 +73,11 @@ Rutas por organización (requieren sesión; sin ella responden 401, sin el rol n
 | GET | `/assessments/:id/evidence/:evidenceId/file` | Ver o descargar el archivo | todos |
 | DELETE | `/assessments/:id/evidence/:evidenceId` | Borrar evidencia (queda en la auditoría) | ADMIN, CONSULTANT |
 
+### Resultado y tablero (`/evaluaciones/:id/resultado`)
+`GET /assessments/:id/result` devuelve: puntaje general y madurez promedio **sobre lo ya evaluado** (los pendientes no cuentan como 0; `coverage` dice cuánto se evaluó), controles que alcanzan el objetivo, distribución por nivel 0-4, puntaje/promedio por dominio y brechas con su dominio y tamaño, **ordenadas de la más grande a la más chica**.
+
+La web lo muestra como cifra principal + indicadores, madurez por dominio (barras con la línea del objetivo), controles por nivel (escala ordinal de un solo tono) y la tabla de brechas, con link a cada control en el asistente. Colores validados con el validador de paleta (contraste y separación); cada gráfico tiene tooltip (mouse y teclado) y **vista de tabla** equivalente; las severidades llevan ícono + etiqueta, nunca solo color.
+
 ### Archivos de evidencia
 - Imágenes **PNG, JPG, WebP** y **PDF**, hasta **10 MB**. El tipo se verifica por el **contenido** del archivo (no por la extensión): un SVG o HTML disfrazado de imagen se rechaza.
 - Se guardan en un almacenamiento **compatible con S3** (AWS S3, Cloudflare R2, Backblaze…; en desarrollo, SeaweedFS con `docker compose up -d files`). En producción `S3_BUCKET` es obligatorio y el bucket debe existir (con AWS, usá `S3_SSE=AES256`).

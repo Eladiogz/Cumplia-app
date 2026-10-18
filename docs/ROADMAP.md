@@ -26,7 +26,7 @@ Pendientes menores para más adelante: cola de emails con reintentos (outbox), l
 - Base Next.js (apps/web), proxy /api, acceso completo: ingreso, registro, MFA, invitaciones, organización y seguridad (hecho)
 - Asistente de gap assessment (respuestas por control, justificación, evidencia) (hecho)
 - Evidencia con archivos (imágenes y PDF en almacenamiento S3, huella SHA-256) y links en las notas (hecho)
-- Tablero de madurez (puntaje por dominio, brechas priorizadas)
+- Tablero de madurez (puntaje por dominio, brechas priorizadas) (hecho)
 - Exportación de la SoA (PDF/Excel)
 - Registro de riesgos (API + web)
 - Pruebas de punta a punta en navegador (Playwright) y Content-Security-Policy con nonce

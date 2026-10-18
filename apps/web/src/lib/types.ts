@@ -90,6 +90,40 @@ export interface Answer {
   justification?: string;
 }
 
+export interface DomainScore {
+  domain: string;
+  label: string;
+  applicable: number;
+  assessed: number;
+  score: number;
+  average: number | null;
+  meetingTarget: number;
+}
+
+export interface Gap {
+  controlId: string;
+  title: string;
+  domain: string;
+  maturity: number;
+  target: number;
+  gap: number;
+}
+
+export interface AssessmentResult {
+  frameworkId: string;
+  targetMaturity: number;
+  overallScore: number;
+  averageMaturity: number | null;
+  coverage: number;
+  applicable: number;
+  notApplicable: number;
+  pending: number;
+  meetingTarget: number;
+  distribution: [number, number, number, number, number];
+  byDomain: DomainScore[];
+  gaps: Gap[];
+}
+
 export interface Evidence {
   id: string;
   controlId: string;

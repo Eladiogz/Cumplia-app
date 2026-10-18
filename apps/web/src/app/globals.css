@@ -27,6 +27,23 @@
   --border: oklch(0.915 0.008 250);
   --input: oklch(0.88 0.01 250);
   --ring: oklch(0.55 0.12 257);
+
+  /*
+   * Gráficos. Validados con el validador de paleta sobre la tarjeta blanca:
+   * serie única (azul, contraste >= 3:1) y escala ordinal de madurez 0→4
+   * (un solo tono, claro→oscuro, saltos visibles, extremo claro >= 2:1).
+   */
+  --chart-series: #2a78d6;
+  --maturity-0: #86b6ef;
+  --maturity-1: #5598e7;
+  --maturity-2: #2a78d6;
+  --maturity-3: #1c5cab;
+  --maturity-4: #104281;
+  --chart-grid: #e1e0d9;
+  --chart-baseline: #c3c2b7;
+  --chart-target: #0b0b0b;
+  /* Estado "serio/alto" (entre advertencia y crítico): siempre con ícono + etiqueta. */
+  --serious: #c2410c;
 }
 
 @theme inline {
@@ -47,6 +64,7 @@
   --color-destructive: var(--destructive);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-serious: var(--serious);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
