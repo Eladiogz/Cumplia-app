@@ -59,7 +59,7 @@ export function RiskMatrix({
                     onFocus={() => setActive(key)}
                     onBlur={() => setActive(null)}
                     className={cn(
-                      "relative grid h-14 place-content-center gap-0.5 rounded-md border border-black/5 text-center transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-16",
+                      "relative grid h-14 place-content-center gap-0.5 rounded-md border border-foreground/5 text-center transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-16",
                       dimmed && "opacity-45",
                       isSelected && "ring-2 ring-foreground",
                     )}
@@ -138,7 +138,7 @@ export function RiskMatrixTable({ risks, mode }: { risks: Risk[]; mode: MatrixMo
 
   if (rows.length === 0) return <p className="text-sm text-muted-foreground">No hay riesgos para mostrar en esta vista.</p>;
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="text-left text-xs text-muted-foreground">
           <tr className="border-b">

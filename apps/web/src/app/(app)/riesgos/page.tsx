@@ -80,7 +80,8 @@ export default function RisksPage() {
           </div>
         }
       />
-      <div className="grid gap-4">
+      {/* minmax(0,1fr): la columna no se estira por la tabla ancha (la tabla hace su propio scroll). */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
         <FormError message={error} />
         {!risks ? (
           !error && <Spinner />
@@ -311,7 +312,8 @@ function RiskList({ risks }: { risks: Risk[] }) {
       </div>
 
       <Card className="hidden py-0 md:block">
-        <div className="overflow-x-auto">
+        {/* relative: lo posicionado adentro (p. ej. textos sr-only) queda dentro del scroll y no ensancha la página. */}
+        <div className="relative overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-xs text-muted-foreground">
               <tr className="border-b">
