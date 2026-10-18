@@ -78,6 +78,16 @@ Rutas por organización (requieren sesión; sin ella responden 401, sin el rol n
 
 La web lo muestra como cifra principal + indicadores, madurez por dominio (barras con la línea del objetivo), controles por nivel (escala ordinal de un solo tono) y la tabla de brechas, con link a cada control en el asistente. Colores validados con el validador de paleta (contraste y separación); cada gráfico tiene tooltip (mouse y teclado) y **vista de tabla** equivalente; las severidades llevan ícono + etiqueta, nunca solo color.
 
+### Exportar la Declaración de Aplicabilidad (SoA)
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| GET | `/assessments/:id/soa.pdf` | SoA en PDF (A4 apaisado, para firmar y presentar) | todos, con email verificado |
+| GET | `/assessments/:id/soa.xlsx` | SoA en Excel: hojas Resumen, Declaración de Aplicabilidad (filtrable) y Brechas | todos, con email verificado |
+
+- Por cada control del Anexo A: título, si aplica, **justificación de inclusión o exclusión**, estado de implementación (madurez) y cantidad de evidencias (ISO/IEC 27001 cláusula 6.1.3 d).
+- Se generan en el servidor desde los mismos datos que valida la API (acotados a la organización con RLS) y cada exportación queda en la auditoría (`soa.export`).
+- Los textos de los usuarios se escriben en el Excel como **texto**: nunca se interpretan como fórmulas.
+
 ### Archivos de evidencia
 - Imágenes **PNG, JPG, WebP** y **PDF**, hasta **10 MB**. El tipo se verifica por el **contenido** del archivo (no por la extensión): un SVG o HTML disfrazado de imagen se rechaza.
 - Se guardan en un almacenamiento **compatible con S3** (AWS S3, Cloudflare R2, Backblaze…; en desarrollo, SeaweedFS con `docker compose up -d files`). En producción `S3_BUCKET` es obligatorio y el bucket debe existir (con AWS, usá `S3_SSE=AES256`).

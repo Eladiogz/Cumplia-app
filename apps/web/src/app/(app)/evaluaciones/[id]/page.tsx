@@ -6,6 +6,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEven
 import { AlertCircle, ArrowLeft, BarChart3, Check, ChevronDown, CircleDashed, FileText, Loader2, Pencil, SkipForward } from "lucide-react";
 import { MATURITY_LEVELS } from "@cumplia/core/maturity";
 import { EvidenceSection } from "@/components/evidence-section";
+import { SoaExportMenu } from "@/components/soa-export";
 import { Field, FormError, Spinner } from "@/components/form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -367,6 +368,7 @@ function AssessmentHeader({
                 <BarChart3 aria-hidden /> Ver resultado
               </Link>
             </Button>
+            <SoaExportMenu assessmentId={assessment.id} />
           </div>
         </div>
       )}

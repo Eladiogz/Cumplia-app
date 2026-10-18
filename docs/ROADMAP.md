@@ -27,7 +27,7 @@ Pendientes menores para más adelante: cola de emails con reintentos (outbox), l
 - Asistente de gap assessment (respuestas por control, justificación, evidencia) (hecho)
 - Evidencia con archivos (imágenes y PDF en almacenamiento S3, huella SHA-256) y links en las notas (hecho)
 - Tablero de madurez (puntaje por dominio, brechas priorizadas) (hecho)
-- Exportación de la SoA (PDF/Excel)
+- Exportación de la SoA (PDF/Excel) (hecho)
 - Registro de riesgos (API + web)
 - Pruebas de punta a punta en navegador (Playwright) y Content-Security-Policy con nonce
 
