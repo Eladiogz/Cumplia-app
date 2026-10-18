@@ -22,24 +22,30 @@ export function ChartCard({
   description,
   chart,
   table,
+  actions,
 }: {
   title: string;
   description?: string;
   chart: ReactNode;
   table: ReactNode;
+  /** Controles extra del encabezado (p. ej. cambiar de vista). */
+  actions?: ReactNode;
 }) {
   const [asTable, setAsTable] = useState(false);
   return (
     <Card>
-      <CardHeader className="flex-row items-start justify-between gap-4">
+      <CardHeader className="flex-row flex-wrap items-start justify-between gap-4">
         <div className="grid gap-1.5">
           <CardTitle>{title}</CardTitle>
           {description && <CardDescription>{description}</CardDescription>}
         </div>
-        <Button variant="ghost" size="sm" onClick={() => setAsTable(!asTable)} aria-pressed={asTable}>
-          {asTable ? <BarChart3 aria-hidden /> : <Table2 aria-hidden />}
-          {asTable ? "Ver gráfico" : "Ver como tabla"}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {actions}
+          <Button variant="ghost" size="sm" onClick={() => setAsTable(!asTable)} aria-pressed={asTable}>
+            {asTable ? <BarChart3 aria-hidden /> : <Table2 aria-hidden />}
+            {asTable ? "Ver gráfico" : "Ver como tabla"}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>{asTable ? table : chart}</CardContent>
     </Card>
@@ -47,7 +53,7 @@ export function ChartCard({
 }
 
 /** Tooltip: el valor primero (fuerte), la etiqueta después. */
-function Tip({ value, children, className }: { value: string; children: ReactNode; className?: string }) {
+export function Tip({ value, children, className }: { value: string; children: ReactNode; className?: string }) {
   return (
     <div
       role="tooltip"

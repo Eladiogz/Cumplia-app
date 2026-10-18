@@ -2,24 +2,33 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowRight, ClipboardList, ShieldAlert, ShieldCheck, Users } from "lucide-react";
+import { ArrowRight, ClipboardList, Gauge, ShieldAlert, ShieldCheck, Users } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import { ROLE_DESCRIPTION, ROLE_LABEL, canManageMembers } from "@/lib/roles";
 import { useMe } from "@/lib/session";
-import type { Assessment } from "@/lib/types";
+import { levelIn } from "@/lib/risk";
+import type { Assessment, Risk } from "@/lib/types";
+
+const highOrCritical = (risks: Risk[]) =>
+  risks.filter((r) => ["high", "critical"].includes(levelIn(r, "inherent")!.level)).length;
 
 export default function HomePage() {
   const { me, organizations } = useMe();
   const organization = organizations.find((o) => o.active);
   const [assessments, setAssessments] = useState<Assessment[] | null>(null);
 
+  const [risks, setRisks] = useState<Risk[] | null>(null);
+
   useEffect(() => {
     api<Assessment[]>("/assessments")
       .then(setAssessments)
       .catch(() => setAssessments([]));
+    api<Risk[]>("/risks")
+      .then(setRisks)
+      .catch(() => setRisks([]));
   }, []);
 
   const firstName = me.user.name?.split(" ")[0];
@@ -48,6 +57,29 @@ export default function HomePage() {
             <Button asChild variant={assessments?.length ? "outline" : "default"} size="sm" className="w-fit">
               <Link href="/evaluaciones">
                 {assessments?.length ? "Ver evaluaciones" : "Empezar una evaluación"} <ArrowRight aria-hidden />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Gauge className="size-4 text-primary" aria-hidden /> Riesgos
+            </CardTitle>
+            <CardDescription>Registro con matriz 5×5, tratamiento y responsables.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 text-sm">
+            <p>
+              {risks === null
+                ? "Cargando…"
+                : risks.length === 0
+                  ? "Todavía no hay riesgos registrados."
+                  : `${risks.length} riesgo${risks.length === 1 ? "" : "s"} registrado${risks.length === 1 ? "" : "s"} · ${highOrCritical(risks)} de nivel alto o crítico.`}
+            </p>
+            <Button asChild variant={risks?.length ? "outline" : "default"} size="sm" className="w-fit">
+              <Link href="/riesgos">
+                {risks?.length ? "Ver riesgos" : "Registrar riesgos"} <ArrowRight aria-hidden />
               </Link>
             </Button>
           </CardContent>

@@ -1,5 +1,7 @@
 // Formas de las respuestas de la API que usa la web.
 
+import type { RiskStatus, RiskTreatment } from "@cumplia/core/risk";
+
 export type Role = "ADMIN" | "CONSULTANT" | "AUDITOR";
 
 export interface User {
@@ -135,6 +137,37 @@ export interface Evidence {
   fileSize: number | null;
   contentType: string | null;
   sha256: string | null;
+}
+
+export interface Risk {
+  id: string;
+  number: number;
+  title: string;
+  description: string | null;
+  asset: string | null;
+  threat: string | null;
+  likelihood: number;
+  impact: number;
+  treatment: RiskTreatment;
+  treatmentPlan: string | null;
+  controlIds: string[];
+  residualLikelihood: number | null;
+  residualImpact: number | null;
+  status: RiskStatus;
+  ownerId: string | null;
+  ownerName: string | null;
+  ownerEmail: string | null;
+  /** AAAA-MM-DD */
+  dueDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Miembro que se puede asignar como responsable de un riesgo. */
+export interface RiskOwner {
+  userId: string;
+  name: string | null;
+  email: string;
 }
 
 /** Respuesta de login/registro/verificación cuando ya hay sesión. */
