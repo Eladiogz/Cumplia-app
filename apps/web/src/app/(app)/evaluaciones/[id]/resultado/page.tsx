@@ -207,7 +207,7 @@ function GapsTable({ assessmentId, gaps, domains }: { assessmentId: string; gaps
             No hay brechas{domain ? " en este dominio" : ""} entre los controles evaluados.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-xs text-muted-foreground">
                 <tr className="border-b">

@@ -2,8 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
-import { Building2, Check, ChevronsUpDown, ClipboardList, Gauge, Home, LogOut, MailWarning, ShieldCheck, ShieldAlert } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  Building2,
+  Check,
+  ChevronsUpDown,
+  ClipboardList,
+  Gauge,
+  Home,
+  LogOut,
+  MailWarning,
+  Monitor,
+  Moon,
+  ShieldAlert,
+  ShieldCheck,
+  Sun,
+} from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -18,6 +32,7 @@ import {
 import { api, errorMessage } from "@/lib/api";
 import { ROLE_LABEL } from "@/lib/roles";
 import { logout, switchOrganization, useMe } from "@/lib/session";
+import { THEME_LABEL, applyTheme, currentTheme, type Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -171,6 +186,39 @@ function OrganizationSwitcher() {
   );
 }
 
+const THEME_ICON: Record<Theme, typeof Monitor> = { system: Monitor, light: Sun, dark: Moon };
+
+/** Tema: según el sistema, claro u oscuro. Se aplica al instante y se recuerda. */
+function ThemeChoices() {
+  const [theme, setTheme] = useState<Theme>("system");
+  // Se lee al montar (el atributo lo puso el servidor según la cookie).
+  useEffect(() => setTheme(currentTheme()), []);
+  return (
+    <>
+      <DropdownMenuLabel>Tema</DropdownMenuLabel>
+      {(["system", "light", "dark"] as const).map((t) => {
+        const Icon = THEME_ICON[t];
+        return (
+          <DropdownMenuItem
+            key={t}
+            onSelect={(e) => {
+              e.preventDefault(); // el menú queda abierto: se ve el cambio
+              applyTheme(t);
+              setTheme(t);
+            }}
+            aria-checked={theme === t}
+            role="menuitemradio"
+          >
+            <Icon aria-hidden />
+            <span className="flex-1">{THEME_LABEL[t]}</span>
+            <Check className={cn("text-primary", theme !== t && "invisible")} aria-hidden />
+          </DropdownMenuItem>
+        );
+      })}
+    </>
+  );
+}
+
 function UserMenu() {
   const { me } = useMe();
   const initials = (me.user.name ?? me.user.email).slice(0, 2).toUpperCase();
@@ -193,6 +241,9 @@ function UserMenu() {
             <ShieldCheck aria-hidden /> Seguridad
           </Link>
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <ThemeChoices />
+        <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => void logout()}>
           <LogOut aria-hidden /> Cerrar sesión
         </DropdownMenuItem>

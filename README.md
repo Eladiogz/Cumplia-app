@@ -44,6 +44,8 @@ Abrí **http://localhost:3001**: la web reenvía `/api/*` a la API (mismo origen
 - `TRUST_PROXY`: IPs del proxy (la web). Solo de ellas la API acepta `X-Forwarded-For`; así el límite de intentos es por usuario real y nadie más puede falsificar su IP.
 - `APP_ORIGIN` debe ser el origen de la web (protección CSRF) y es la base de los links de los emails.
 - La web solo muestra u oculta controles según el rol; **quien decide es siempre la API**.
+- **Tema claro, oscuro o según el sistema** (menú de usuario). La elección se guarda en la cookie `cumplia_theme` y el servidor ya entrega la página con esos colores: sin parpadeo y sin scripts antes del pintado. Todos los colores son variables en `apps/web/src/app/globals.css`; los del modo oscuro de los gráficos mantienen el contraste mínimo (serie >= 3:1, escala de madurez >= 2:1) y un test verifica que el oscuro elegido y el del sistema sean idénticos.
+- **Content Security Policy con nonce** (`apps/web/src/proxy.ts`): cada página lleva un nonce aleatorio nuevo y solo corren los `<script>` que lo traen (`'strict-dynamic'`, sin `unsafe-inline` ni `unsafe-eval` en producción). Un script inyectado por XSS no conoce el nonce y el navegador lo bloquea. Además: `object-src 'none'`, `frame-ancestors 'none'`, `base-uri` y `form-action 'self'`, y todo dato solo hacia el mismo origen. Por eso las páginas se renderizan por petición (no se prerenderizan). Los atributos `style="…"` se permiten (`style-src-attr`): no ejecutan código.
 
 **Si ya tenías el volumen de Postgres creado** (el script de inicio solo corre con un volumen nuevo), creá el usuario de la API una vez:
 ```bash
