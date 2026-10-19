@@ -25,3 +25,51 @@ jobs:
       - run: pnpm test
       - name: Auditoría de dependencias
         run: pnpm audit --prod --audit-level=high
+
+  # De punta a punta: web + API compiladas, Postgres real (con RLS) y Mailpit para los emails.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cumplia
+          POSTGRES_PASSWORD: cumplia
+          POSTGRES_DB: cumplia
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cumplia"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      mail:
+        image: axllent/mailpit:v1.31.3
+        ports:
+          - 1025:1025
+          - 8025:8025
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Navegador (Chromium) y sus dependencias del sistema
+        run: pnpm --filter @cumplia/e2e exec playwright install --with-deps chromium
+      - name: Pruebas de punta a punta
+        run: pnpm test:e2e
+        env:
+          CI: "true"
+      - name: Reporte y trazas si algo falla
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            apps/e2e/playwright-report
+            apps/e2e/test-results
+          retention-days: 7

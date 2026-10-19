@@ -11,5 +11,8 @@ next-env.d.ts
 *.log
 .DS_Store
 .vscode/
+# Resultados de Playwright (capturas, trazas y reporte de cada corrida)
+test-results/
+playwright-report/
 # Cookies de pruebas con curl (-c cookies.txt): contienen tokens de sesión
 cookies*.txt

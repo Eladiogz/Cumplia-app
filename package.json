@@ -12,6 +12,7 @@
     "test": "pnpm -r test",
     "lint": "eslint .",
     "typecheck": "pnpm -r typecheck",
+    "test:e2e": "pnpm --filter @cumplia/e2e test:e2e",
     "dev:api": "pnpm --filter @cumplia/api dev",
     "dev:web": "pnpm --filter @cumplia/web dev"
   },

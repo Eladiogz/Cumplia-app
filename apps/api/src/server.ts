@@ -58,6 +58,15 @@ const devTenant = process.env.ALLOW_DEV_TENANT_HEADER === "true" && !isProd;
 const session = createSessionTenantResolver(db);
 const allowedOrigins = (process.env.APP_ORIGIN ?? "http://localhost:3001").split(",").map((o) => o.trim());
 
+/** Límite opcional por variable de entorno (entero positivo); si no, el valor por defecto de la app. */
+const positiveInt = (name: string): number | undefined => {
+  const raw = process.env[name];
+  if (!raw) return undefined;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) throw new Error(`${name} debe ser un entero positivo`);
+  return n;
+};
+
 /** TRUST_PROXY: IPs/CIDR del proxy separadas por coma (recomendado), o true/false. */
 const parseTrustProxy = (value: string | undefined): boolean | string => {
   if (!value || value === "false") return false;
@@ -70,6 +79,9 @@ const app = buildApp({
   db,
   resolveTenant: devTenant ? firstOf(session, createDevTenantResolver(db)) : session,
   secureCookies: isProd,
+  // Por IP y por minuto. Por defecto 10 (ingreso/registro/MFA) y 100 (resto); las pruebas E2E los suben.
+  authRateLimit: positiveInt("AUTH_RATE_LIMIT"),
+  apiRateLimit: positiveInt("API_RATE_LIMIT"),
   mfaEncryptionKey,
   allowedOrigins,
   mailer,
