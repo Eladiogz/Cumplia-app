@@ -1,4 +1,4 @@
-import { expect, login, logout, newAccount, register, test, totp, waitForEmail } from "./support.js";
+import { appAlert, expect, login, logout, newAccount, register, test, totp, waitForEmail } from "./support.js";
 
 test("verificación en dos pasos: activar con la app y luego exigir el código al ingresar", async ({ page }) => {
   const account = newAccount("mfa");
@@ -24,7 +24,8 @@ test("verificación en dos pasos: activar con la app y luego exigir el código a
 
   await page.getByLabel("Código", { exact: true }).fill("000000");
   await page.getByRole("button", { name: "Verificar" }).click();
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(appAlert(page)).toBeVisible();
+  await expect(page).toHaveURL(/\/ingresar\/verificacion/);
 
   // Código del período siguiente: el del período actual ya se usó al activar.
   await page.getByLabel("Código", { exact: true }).fill(totp(secret, Date.now() + 30_000));
