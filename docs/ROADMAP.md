@@ -20,16 +20,19 @@ Monorepo, CI/CD, datos de ISO 27001:2022, motor de puntaje, SoA, API stateless.
 
 - Seguridad de cuentas: política de contraseñas robusta (composición + comunes/filtradas + datos personales), recuperación y cambio de contraseña, verificación de email, acciones de ADMIN seguras para multi-tenant (hecho)
 
-Pendientes menores para más adelante: cola de emails con reintentos (outbox), lista de sesiones activas por dispositivo, paleta de colores con fondo menos blanco.
-
-## Fase 3 — Aplicación web
+## Fase 3 — Aplicación web (hecha)
 - Base Next.js (apps/web), proxy /api, acceso completo: ingreso, registro, MFA, invitaciones, organización y seguridad (hecho)
 - Asistente de gap assessment (respuestas por control, justificación, evidencia) (hecho)
 - Evidencia con archivos (imágenes y PDF en almacenamiento S3, huella SHA-256) y links en las notas (hecho)
 - Tablero de madurez (puntaje por dominio, brechas priorizadas) (hecho)
 - Exportación de la SoA (PDF/Excel) (hecho)
-- Registro de riesgos (API + web)
-- Pruebas de punta a punta en navegador (Playwright) y Content-Security-Policy con nonce
+- Registro de riesgos con matriz 5×5 y mapa de calor (API + web) (hecho)
+- Sesiones activas por dispositivo, Content-Security-Policy con nonce, cola de emails con reintentos, tema claro/oscuro (hecho)
+- Pruebas de punta a punta en navegador (Playwright) en CI (hecho)
+
+## Antes del piloto
+- Revisión de seguridad completa y corrección de hallazgos
+- Términos y condiciones, política de privacidad y acuerdo de tratamiento de datos (revisados por un abogado)
 
 ## Fase 4 — Evidencias automáticas
 - Integración M365/Entra (MFA, accesos privilegiados, reglas de reenvío)
