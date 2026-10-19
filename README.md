@@ -38,6 +38,20 @@ pnpm dev:web        # terminal 2 (con el .env cargado): web en http://localhost:
 ```
 Abrí **http://localhost:3001**: la web reenvía `/api/*` a la API (mismo origen, sin CORS; la cookie de sesión funciona sola). Los emails (invitaciones, avisos) se ven en Mailpit: http://localhost:8025.
 
+### Pruebas de punta a punta (Playwright)
+`apps/e2e` recorre la aplicación como una persona: la web y la API compiladas, Postgres real (la API con el rol sin privilegios, así que RLS se aplica) y Mailpit para leer los emails de verdad.
+```bash
+docker compose up -d db mail
+pnpm build
+pnpm --filter @cumplia/e2e exec playwright install chromium   # una vez
+pnpm test:e2e
+```
+- Cubre: registro y confirmación por email, ingreso, recuperación de contraseña, MFA con código TOTP, evaluación y exportación de la SoA, registro de riesgos y mapa de calor, tema, celular, y **multi-tenant** (otra organización no ve ni abre los datos ajenos; una invitación da acceso solo a la organización que invita, con su rol).
+- Cada prueba **falla si aparece una violación de la CSP o un error de JavaScript** en el navegador.
+- Usa una base **temporal** (`cumplia_e2e_pw`, se recrea en cada corrida) y los puertos 3200 (API) y 3201 (web): no toca tu base de desarrollo.
+- En Linux/WSL, Chromium necesita librerías del sistema: `sudo pnpm --filter @cumplia/e2e exec playwright install-deps chromium` (en CI se instalan solas).
+- En CI corre en un job aparte con Postgres y Mailpit como servicios; si falla, sube el reporte con capturas y trazas.
+
 ### Web y API detrás del proxy
 - `API_URL`: a dónde reenvía la web `/api/*`. Se lee **al compilar** la web (`next build`) y al arrancarla.
 - `API_PUBLIC_PREFIX=/api`: la API sabe que el navegador la ve bajo `/api` (p. ej. para la ruta de la cookie del segundo paso del login).

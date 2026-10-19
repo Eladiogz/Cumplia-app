@@ -34,6 +34,8 @@ export interface AppOptions {
   allowedOrigins?: string[];
   /** Peticiones por minuto y por IP a /auth/register, /auth/login y /auth/mfa/*. */
   authRateLimit?: number;
+  /** Peticiones por minuto y por IP al resto de la API. */
+  apiRateLimit?: number;
   /**
    * Clave AES-256 para los secretos TOTP. Sin ella no se registran las rutas de MFA
    * (los usuarios con MFA activo no pueden completar el login: falla cerrado).
@@ -61,6 +63,7 @@ export function buildApp({
   secureCookies = false,
   allowedOrigins = [],
   authRateLimit = 10,
+  apiRateLimit = 100,
   mfaEncryptionKey,
   mailer: givenMailer,
   appUrl = allowedOrigins[0] ?? "http://localhost:3001",
@@ -77,7 +80,7 @@ export function buildApp({
   app.register(cookie);
   // Solo lee el archivo cuando la ruta lo pide (req.file()), después de verificar sesión y permisos.
   app.register(multipart, { limits: { fileSize: MAX_EVIDENCE_BYTES, files: 1 } });
-  app.register(rateLimit, { max: 100, timeWindow: "1 minute" });
+  app.register(rateLimit, { max: apiRateLimit, timeWindow: "1 minute" });
 
   // Defensa CSRF adicional a SameSite: un navegador siempre envía Origin en peticiones
   // que modifican datos entre sitios; si no es uno de los nuestros, se rechaza.
