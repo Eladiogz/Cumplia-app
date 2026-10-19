@@ -18,7 +18,7 @@ import { failedAttempt } from "../security/lockout.js";
 import { dummyHash, hashPassword, verifyPassword } from "../security/password.js";
 import { assertStrongPassword } from "../security/password-policy.js";
 import { sendEmailVerification } from "./password.js";
-import { Email, NewPassword } from "./schemas.js";
+import { Email, NewPassword, OrganizationName, PersonName } from "./schemas.js";
 import {
   MFA_CHALLENGE_COOKIE,
   MFA_CHALLENGE_MINUTES,
@@ -34,8 +34,8 @@ export const INVALID = "Credenciales inválidas";
 const RegisterBody = z.object({
   email: Email,
   password: NewPassword,
-  name: z.string().trim().min(1).max(100).optional(),
-  organizationName: z.string().trim().min(2).max(120),
+  name: PersonName.optional(),
+  organizationName: OrganizationName,
 });
 
 const LoginBody = z.object({ email: Email, password: z.string().min(1).max(128) });

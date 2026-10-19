@@ -10,6 +10,11 @@ import { RoleSchema } from "../tenant.js";
 import { Email } from "./schemas.js";
 
 export const INVITATION_DAYS = 7;
+/**
+ * Tope de invitaciones por organización y por hora: alcanza de sobra para sumar un
+ * equipo, y evita que una cuenta use Cumplia para mandar emails masivos (spam o phishing).
+ */
+export const INVITATIONS_PER_HOUR = 20;
 
 const InvitationBody = z.object({ email: Email, role: RoleSchema });
 const InvitationParams = z.object({ invitationId: z.string().uuid() });
@@ -38,6 +43,11 @@ export async function invitationRoutes(app: FastifyInstance, { db, mailer, appUr
   app.post("/invitations", requires("members:manage", { verifiedEmail: true }), async (req, reply) => {
     const { email, role } = InvitationBody.parse(req.body);
     const r = repo(req);
+    if ((await r.countRecentInvitations(60)) >= INVITATIONS_PER_HOUR) {
+      return reply
+        .code(429)
+        .send({ error: `Llegaste al máximo de ${INVITATIONS_PER_HOUR} invitaciones por hora. Probá de nuevo más tarde.` });
+    }
     const token = newSessionToken();
     const invitation = await r.createInvitation({
       email,

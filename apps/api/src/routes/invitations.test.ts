@@ -174,6 +174,39 @@ const joinVia = async (adminCookie: string, role: Role) => {
   return { email, cookie: cookieOf(res)!, userId: (res.json() as { user: { id: string } }).user.id };
 };
 
+describe("abuso de las invitaciones (spam o phishing desde nuestro dominio)", () => {
+  it("como mucho 20 invitaciones por hora por organización", async () => {
+    const admin = await registerAdmin();
+    for (let i = 0; i < 20; i++) await invite(admin.cookie, uniqueEmail());
+    const extra = await call("POST", "/invitations", admin.cookie, { email: uniqueEmail(), role: "AUDITOR" });
+    expect(extra.statusCode).toBe(429);
+    expect(extra.json().error).toMatch(/20 invitaciones por hora/);
+    // Otra organización no se ve afectada.
+    const other = await registerAdmin();
+    await invite(other.cookie, uniqueEmail());
+  });
+
+  it("los nombres que van en los emails no pueden traer links", async () => {
+    for (const organizationName of ["Verificá tu cuenta en https://malo.example", "Soporte www.banco-falso.com", "Pagos seguros-pago.com"]) {
+      const res = await call("POST", "/auth/register", undefined, { email: uniqueEmail(), password: PASSWORD, organizationName });
+      expect(res.statusCode, organizationName).toBe(400);
+      expect(res.json().error).toMatch(/no puede contener links/);
+    }
+    const res = await call("POST", "/auth/register", undefined, {
+      email: uniqueEmail(),
+      password: PASSWORD,
+      organizationName: "Empresa",
+      name: "Ana http://malo.example",
+    });
+    expect(res.statusCode).toBe(400);
+
+    // Nombres reales con puntos, siglas y símbolos siguen funcionando.
+    const admin = await registerAdmin("Estudio Pérez & Asoc. S.A.");
+    expect((await call("PATCH", "/organization", admin.cookie, { name: "Pérez Hnos. S.R.L." })).statusCode).toBe(200);
+    expect((await call("PATCH", "/organization", admin.cookie, { name: "Pérez en perez-hnos.com.ar" })).statusCode).toBe(400);
+  });
+});
+
 describe("aceptar una invitación", () => {
   it("la vista previa muestra organización y rol; un token inventado no", async () => {
     const admin = await registerAdmin("Consultora Sur");

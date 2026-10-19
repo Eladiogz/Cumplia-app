@@ -17,7 +17,7 @@ import {
 import { hashPassword } from "../security/password.js";
 import { assertStrongPassword } from "../security/password-policy.js";
 import { currentSession, hashToken, startSession } from "../security/session.js";
-import { NewPassword } from "./schemas.js";
+import { NewPassword, PersonName } from "./schemas.js";
 
 const Token = z.string().trim().min(20).max(200);
 const PreviewBody = z.object({ token: Token });
@@ -25,7 +25,7 @@ const AcceptBody = z.object({
   token: Token,
   // Solo para crear una cuenta nueva; con sesión iniciada se ignoran.
   password: NewPassword.optional(),
-  name: z.string().trim().min(1).max(100).optional(),
+  name: PersonName.optional(),
 });
 const SwitchBody = z.object({ organizationId: z.string().uuid() });
 const SessionParams = z.object({ sessionId: z.string().uuid() });

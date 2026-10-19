@@ -479,6 +479,22 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
       });
     },
 
+    /** Invitaciones creadas por la organización en los últimos `minutes` (para limitar envíos). */
+    async countRecentInvitations(minutes: number) {
+      const [row] = await inTenant((tx) =>
+        tx
+          .select({ n: sql<number>`count(*)::int` })
+          .from(invitations)
+          .where(
+            and(
+              eq(invitations.organizationId, organizationId),
+              gt(invitations.createdAt, sql`now() - make_interval(mins => ${minutes})`),
+            ),
+          ),
+      );
+      return row?.n ?? 0;
+    },
+
     /** Invitaciones pendientes y vigentes (nunca devuelve el hash del token). */
     listInvitations() {
       return inTenant((tx) =>

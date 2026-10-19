@@ -111,8 +111,14 @@ export async function createSession(
 }
 
 /**
+ * Horas sin actividad tras las que una sesión deja de valer, aunque no haya llegado a
+ * su vencimiento (7 días): una computadora compartida u olvidada no queda abierta.
+ */
+export const SESSION_IDLE_HOURS = 12;
+
+/**
  * Sesión vigente + rol actual (se lee en cada petición: un cambio de rol rige al instante).
- * Si quitaron al usuario de la organización, deja de ser válida.
+ * Si quitaron al usuario de la organización, o pasó SESSION_IDLE_HOURS sin uso, deja de ser válida.
  */
 export async function findActiveSession(db: Db, tokenHash: string) {
   const [row] = await db
@@ -134,7 +140,13 @@ export async function findActiveSession(db: Db, tokenHash: string) {
     )
     .innerJoin(users, eq(users.id, sessions.userId))
     .innerJoin(organizations, eq(organizations.id, sessions.organizationId))
-    .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, sql`now()`)));
+    .where(
+      and(
+        eq(sessions.tokenHash, tokenHash),
+        gt(sessions.expiresAt, sql`now()`),
+        gt(sessions.lastSeenAt, sql`now() - make_interval(hours => ${SESSION_IDLE_HOURS})`),
+      ),
+    );
   return row ?? null;
 }
 
@@ -176,7 +188,13 @@ export async function listSessionsForUser(db: Db, userId: string) {
     })
     .from(sessions)
     .innerJoin(organizations, eq(organizations.id, sessions.organizationId))
-    .where(and(eq(sessions.userId, userId), gt(sessions.expiresAt, sql`now()`)))
+    .where(
+      and(
+        eq(sessions.userId, userId),
+        gt(sessions.expiresAt, sql`now()`),
+        gt(sessions.lastSeenAt, sql`now() - make_interval(hours => ${SESSION_IDLE_HOURS})`),
+      ),
+    )
     .orderBy(desc(sessions.lastSeenAt));
 }
 

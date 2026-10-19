@@ -6,11 +6,12 @@ import { mfaResetByAdminEmail } from "../email/templates.js";
 import { requires } from "../security/permissions.js";
 import { RoleSchema } from "../tenant.js";
 import { sendPasswordReset } from "./password.js";
+import { OrganizationName } from "./schemas.js";
 
 const UserParams = z.object({ userId: z.string().uuid() });
 const OrganizationBody = z
   .object({
-    name: z.string().trim().min(2).max(120).optional(),
+    name: OrganizationName.optional(),
     requireMfa: z.boolean().optional(),
   })
   .refine((b) => b.name !== undefined || b.requireMfa !== undefined, { message: "Nada para actualizar" });
