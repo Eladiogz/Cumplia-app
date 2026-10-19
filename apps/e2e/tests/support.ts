@@ -25,6 +25,16 @@ export const test = base.extend({
   },
 });
 
+/**
+ * Avisos de la app (éxito o error de un formulario). No usar getByRole("alert"): Next.js
+ * agrega su propio role="alert" (el anunciador de rutas) según cómo se navegó, y la
+ * prueba pasaría o fallaría por casualidad.
+ */
+export const appAlert = (page: Page, text?: string | RegExp) => {
+  const alerts = page.locator('[data-slot="alert"]');
+  return text === undefined ? alerts : alerts.filter({ hasText: text });
+};
+
 /** Cumple la política de contraseñas (12+ caracteres, mayúscula, número, símbolo). */
 export const PASSWORD = "Mate-Amargo-con-Facturas-2026";
 

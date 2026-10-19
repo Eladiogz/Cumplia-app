@@ -1,4 +1,4 @@
-import { expect, linkIn, login, logout, newAccount, register, test, verifyEmail, waitForEmail } from "./support.js";
+import { appAlert, expect, linkIn, login, logout, newAccount, register, test, verifyEmail, waitForEmail } from "./support.js";
 
 test.describe("cuenta", () => {
   test("registro, confirmación del email por correo y cierre de sesión", async ({ page }) => {
@@ -23,7 +23,7 @@ test.describe("cuenta", () => {
     await logout(page);
 
     await login(page, account.email, "Otra-Clave-Equivocada-99");
-    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(appAlert(page, "Credenciales inválidas")).toBeVisible();
     await expect(page).toHaveURL(/\/ingresar/);
 
     await login(page, account.email);
@@ -38,7 +38,8 @@ test.describe("cuenta", () => {
     await page.getByRole("link", { name: "¿Olvidaste tu contraseña?" }).click();
     await page.getByLabel("Email de tu cuenta").fill(account.email);
     await page.getByRole("button", { name: "Enviarme el link" }).click();
-    await expect(page.getByRole("alert")).toBeVisible();
+    // Mismo mensaje exista o no la cuenta: no revela qué emails están registrados.
+    await expect(appAlert(page, "Si hay una cuenta con ese")).toBeVisible();
 
     const mail = await waitForEmail(account.email, "Restablecé tu contraseña");
     await page.goto(linkIn(mail.text));
