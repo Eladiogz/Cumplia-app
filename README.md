@@ -37,6 +37,7 @@ Abrí **http://localhost:3001**. Los emails se ven en Mailpit: http://localhost:
 | [Pruebas](docs/testing.md) | Tests unitarios, de aislamiento y de punta a punta (Playwright), y CI |
 | [Hoja de ruta](docs/ROADMAP.md) | Fases hechas y próximas |
 | [Política de seguridad](SECURITY.md) | Cómo reportar una vulnerabilidad |
+| [Términos y Condiciones](docs/legal/terminos-y-condiciones.md) · [Política de Privacidad](docs/legal/politica-de-privacidad.md) | Borradores legales (pendientes de revisión de un abogado) |
 
 ## Flujo de trabajo Git
 - `main` protegida: solo entra por Pull Request con CI en verde.
