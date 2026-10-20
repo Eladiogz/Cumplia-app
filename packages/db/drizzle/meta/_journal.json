@@ -113,6 +113,13 @@
       "when": 1792357617105,
       "tag": "0015_email_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792503754008,
+      "tag": "0016_data_rights",
+      "breakpoints": true
     }
   ]
 }

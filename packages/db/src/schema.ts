@@ -80,7 +80,9 @@ export const memberships = pgTable(
   "memberships",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id").notNull().references(() => users.id),
+    // Borrar la cuenta borra sus membresías (y con ellas sesiones y desafíos MFA).
+    // Antes, la API verifica que ninguna organización quede sin ADMIN.
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     organizationId: uuid("organization_id").notNull().references(() => organizations.id),
     role: roleEnum("role").notNull(),
   },
@@ -238,11 +240,11 @@ export const invitations = pgTable(
     email: text("email").notNull(),
     role: roleEnum("role").notNull(),
     tokenHash: text("token_hash").notNull().unique(),
-    invitedBy: uuid("invited_by").references(() => users.id),
+    invitedBy: uuid("invited_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
-    acceptedBy: uuid("accepted_by").references(() => users.id),
+    acceptedBy: uuid("accepted_by").references(() => users.id, { onDelete: "set null" }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
   },
   (t) => [index("invitations_org_idx").on(t.organizationId)],
@@ -333,3 +335,14 @@ export const auditLogs = pgTable(
   },
   (t) => [index("audit_logs_org_created_idx").on(t.organizationId, t.createdAt)],
 );
+
+/**
+ * Constancia de cada organización eliminada (con su auditoría): queda aunque ya no
+ * exista nada más de ella. Sin datos de la organización, solo cuándo y quién. La
+ * escribe únicamente app_purge_organization (ver 0016); la API no tiene permisos.
+ */
+export const organizationDeletions = pgTable("organization_deletions", {
+  organizationId: uuid("organization_id").primaryKey(),
+  deletedBy: uuid("deleted_by"),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }).notNull().defaultNow(),
+});
