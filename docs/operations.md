@@ -1,6 +1,7 @@
 # Operación
 
 ## Desarrollo local
+Requiere **Node 22** (versión en `.nvmrc`). Con fnm: `fnm install 22 && fnm use 22 && corepack enable pnpm` (corepack activa la versión de pnpm fijada en `package.json`).
 ```bash
 corepack enable
 pnpm install
