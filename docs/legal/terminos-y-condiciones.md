@@ -65,7 +65,7 @@ Cumplia puede suspender el acceso que viole esta sección, en la medida necesari
 
 ## 6. Protección de datos personales
 
-6.1. **Roles.** Respecto de los datos personales incluidos en los Datos del Cliente, el **Cliente es el responsable** de la base de datos y **Cumplia actúa como encargado de tratamiento** (prestador de servicios de tratamiento por cuenta de terceros, art. 25 de la Ley 25.326 y su Decreto Reglamentario 1558/2001). Respecto de los datos de las cuentas de los Usuarios necesarios para operar el Servicio (nombre, email, registros de acceso), Cumplia los trata según su [Política de Privacidad](politica-de-privacidad.md) [●a redactar].
+6.1. **Roles.** Respecto de los datos personales incluidos en los Datos del Cliente, el **Cliente es el responsable** de la base de datos y **Cumplia actúa como encargado de tratamiento** (prestador de servicios de tratamiento por cuenta de terceros, art. 25 de la Ley 25.326 y su Decreto Reglamentario 1558/2001). Respecto de los datos de las cuentas de los Usuarios necesarios para operar el Servicio (nombre, email, registros de acceso), Cumplia los trata según su [Política de Privacidad](politica-de-privacidad.md).
 
 6.2. **Obligaciones de Cumplia como encargado:**
 - (a) tratar los datos solo según las instrucciones del Cliente y para prestar el Servicio, sin aplicarlos a otra finalidad ni cederlos a terceros, salvo a los subencargados de la sección 6.3 o por obligación legal;
