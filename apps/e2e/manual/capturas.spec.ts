@@ -104,6 +104,7 @@ test("recorrido completo para el manual", async ({ page, browser, context }) => 
     await expect(page.getByText("Activa", { exact: true })).toBeVisible();
 
     await shot(page, "10-sesiones", { area: card(page, /Sesiones activas/) });
+    await shot(page, "34-tus-datos", { area: card(page, "Tus datos"), mark: page.getByLabel("Nombre y apellido") });
   });
 
   await test.step("3. Organización y equipo", async () => {
@@ -133,6 +134,10 @@ test("recorrido completo para el manual", async ({ page, browser, context }) => 
 
     await page.reload();
     await shot(page, "16-miembros", { area: card(page, "Miembros") });
+    await shot(page, "35-datos-organizacion", {
+      area: card(page, "Datos de la organización"),
+      mark: page.getByRole("link", { name: "Descargar ZIP" }),
+    });
   });
 
   let assessmentId = "";

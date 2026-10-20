@@ -84,3 +84,26 @@ Una misma cuenta puede pertenecer a varias organizaciones; por ejemplo, un consu
 2. elegí la organización en **Tus organizaciones**.
 
 Cada organización está **completamente aislada** de las demás: lo que cargás en una no se ve desde otra. Al ingresar, Cumplia te lleva a la última organización que usaste.
+
+## 3.8 Exportar todos los datos de la organización
+
+Los datos son de tu organización y te los podés llevar cuando quieras. En **Organización** → **Datos de la organización** → **Exportar todos los datos**, hacé clic en **Descargar ZIP**. El archivo trae:
+- las evaluaciones, con la respuesta y la evidencia de cada control;
+- los **archivos de evidencia**, con su huella SHA-256 para verificar que no cambiaron;
+- el registro de riesgos, los miembros, las invitaciones y el **registro de auditoría completo**;
+- un archivo `LEEME.txt` que explica el contenido. Los datos van en formato JSON, que otras herramientas pueden leer.
+
+![Datos de la organización](img/35-datos-organizacion.png)
+
+Solo el Administrador/a puede exportar, con el email confirmado. La exportación queda en el registro de auditoría.
+
+## 3.9 Eliminar la organización
+
+Si tu organización deja de usar Cumplia, el Administrador/a puede eliminarla con **todos** sus datos. **No se puede deshacer**: exportá los datos antes (3.8) si los vas a necesitar.
+
+En **Organización** → **Datos de la organización** → **Eliminar la organización…**:
+1. Escribí el **nombre exacto** de la organización.
+2. Escribí tu **Contraseña** y, si tenés la verificación en dos pasos, el **Código de tu app** (o un código de recuperación).
+3. Hacé clic en **Eliminar para siempre**.
+
+Cumplia borra evaluaciones, evidencia y archivos, riesgos, invitaciones, accesos y el registro de auditoría, y avisa por email a todos los miembros. Las cuentas de quienes pertenecen a otras organizaciones siguen funcionando en ellas. Las cuentas que no pertenecen a ninguna otra, **incluida la tuya**, también se eliminan.

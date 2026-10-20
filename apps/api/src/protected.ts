@@ -15,6 +15,8 @@ interface Options {
   mailer: Mailer;
   appUrl: string;
   storage?: ObjectStorage;
+  encryptionKey?: Buffer;
+  authRateLimit: number;
 }
 
 /**
@@ -22,7 +24,10 @@ interface Options {
  * sin tenant → 401; organización que exige MFA y usuario sin MFA → 403;
  * rol sin el permiso que declara la ruta → 403.
  */
-export async function protectedRoutes(app: FastifyInstance, { db, resolveTenant, mailer, appUrl, storage }: Options) {
+export async function protectedRoutes(
+  app: FastifyInstance,
+  { db, resolveTenant, mailer, appUrl, storage, encryptionKey, authRateLimit }: Options,
+) {
   app.decorateRequest("tenant", null);
 
   // Una ruta sin permiso declarado no llega a existir: la app no arranca.
@@ -53,7 +58,7 @@ export async function protectedRoutes(app: FastifyInstance, { db, resolveTenant,
   });
 
   app.register(assessmentRoutes, { db, storage });
-  app.register(organizationRoutes, { db, mailer, appUrl });
+  app.register(organizationRoutes, { db, mailer, appUrl, storage, encryptionKey, authRateLimit });
   app.register(invitationRoutes, { db, mailer, appUrl });
   app.register(riskRoutes, { db });
 }

@@ -1,6 +1,6 @@
 # 2. Seguridad de tu cuenta
 
-En **Seguridad** (menú de la izquierda o tu menú de usuario) gestionás la verificación en dos pasos, tu contraseña y tus sesiones abiertas.
+En **Seguridad** (menú de la izquierda o tu menú de usuario) gestionás la verificación en dos pasos, tus datos, tu contraseña, tus sesiones abiertas y, si hace falta, la eliminación de tu cuenta.
 
 ![Pantalla de Seguridad](img/07-seguridad.png)
 
@@ -54,3 +54,25 @@ En **Seguridad** → **Sesiones activas** ves desde dónde está abierta tu cuen
 ## 2.5 Desactivar la verificación en dos pasos
 
 En **Seguridad** → **Desactivar** te pedimos tu contraseña y un código de la app. No se puede desactivar si alguna de tus organizaciones la exige.
+
+## 2.6 Corregir tu nombre
+
+En **Seguridad** → **Tus datos**, escribí tu **Nombre y apellido** y hacé clic en **Guardar**. Tu nombre es el que ven los demás miembros y el que aparece en las invitaciones que enviás.
+
+![Tus datos](img/34-tus-datos.png)
+
+El email identifica tu cuenta y no se cambia desde acá. Si necesitás cambiarlo, escribinos (ver la Política de Privacidad).
+
+## 2.7 Eliminar tu cuenta
+
+En **Seguridad** → **Eliminar tu cuenta** → **Eliminar mi cuenta…**:
+1. Escribí el email de tu cuenta para confirmar.
+2. Escribí tu **Contraseña** y, si tenés la verificación en dos pasos, el **Código de tu app** (o un código de recuperación).
+3. Hacé clic en **Eliminar mi cuenta para siempre**.
+
+Se borran tus datos personales, tus sesiones y tu acceso a todas tus organizaciones, y te llega un email de confirmación. **No se puede deshacer.**
+
+Tené en cuenta:
+- Lo que cargaste en cada organización (evaluaciones, evidencia, riesgos) **es de la organización** y queda. Los riesgos a tu cargo quedan sin responsable.
+- El registro de auditoría de cada organización conserva tus acciones.
+- Si sos el **único Administrador/a** de una organización, Cumplia no te deja eliminar la cuenta: antes nombrá a otra persona como Administrador/a ([3.4](03-equipo.md#34-cambiar-el-rol-o-quitar-a-un-miembro)) o, si sos la única persona, eliminá la organización ([3.9](03-equipo.md#39-eliminar-la-organización)).

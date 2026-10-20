@@ -2,8 +2,6 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   clearLoginFailures,
-  consumeRecoveryCode,
-  consumeTotpStep,
   countUnusedRecoveryCodes,
   deleteMfaChallenge,
   deleteOtherSessionsForUser,
@@ -22,23 +20,14 @@ import { notify, type Mailer } from "../email/mailer.js";
 import { mfaDisabledEmail, mfaEnabledEmail, recoveryCodeUsedEmail } from "../email/templates.js";
 import { decrypt, encrypt } from "../security/encryption.js";
 import { verifyPassword } from "../security/password.js";
+import { SecondFactorFields, checkSecondFactor as checkFactor, isLocked, type User } from "../security/reauth.js";
 import { MFA_CHALLENGE_COOKIE, currentSession, hashToken, startSession } from "../security/session.js";
-import {
-  base32Encode,
-  hashRecoveryCode,
-  newRecoveryCodes,
-  newTotpSecret,
-  otpauthUri,
-  verifyTotp,
-} from "../security/totp.js";
+import { base32Encode, hashRecoveryCode, newRecoveryCodes, newTotpSecret, otpauthUri, verifyTotp } from "../security/totp.js";
 import { MAX_ATTEMPTS, failedAttempt } from "../security/lockout.js";
 import { INVALID } from "./auth.js";
 
 const SecondFactor = z
-  .object({
-    code: z.string().trim().regex(/^\d{6}$/, "Código de 6 dígitos").optional(),
-    recoveryCode: z.string().trim().min(10).max(32).optional(),
-  })
+  .object(SecondFactorFields)
   .refine((b) => (b.code === undefined) !== (b.recoveryCode === undefined), {
     message: "Enviá code o recoveryCode (uno solo)",
   });
@@ -46,8 +35,6 @@ const SecondFactor = z
 const EnableBody = z.object({ code: z.string().trim().regex(/^\d{6}$/, "Código de 6 dígitos") });
 
 const DisableBody = z.intersection(z.object({ password: z.string().min(1).max(128) }), SecondFactor);
-
-type User = NonNullable<Awaited<ReturnType<typeof getUserById>>>;
 
 interface Options {
   db: Db;
@@ -69,22 +56,10 @@ export async function mfaRoutes(
   const sealSecret = (userId: string, secret: Buffer) => encrypt(encryptionKey, secret, `mfa:${userId}`);
   const openSecret = (userId: string, sealed: string) => decrypt(encryptionKey, sealed, `mfa:${userId}`);
 
-  const isLocked = (user: User) => (user.lockedUntil ? user.lockedUntil.getTime() > Date.now() : false);
-
   const currentUser = (req: FastifyRequest) => currentSession(db, req);
 
-  /** Verifica un código TOTP (sin reutilizar pasos) o gasta un código de recuperación. */
-  const checkSecondFactor = async (user: User, input: { code?: string; recoveryCode?: string }) => {
-    if (input.code !== undefined) {
-      if (!user.mfaSecret) return null;
-      const step = verifyTotp(openSecret(user.id, user.mfaSecret), input.code);
-      return step !== null && (await consumeTotpStep(db, user.id, step)) ? ("totp" as const) : null;
-    }
-    if (input.recoveryCode !== undefined) {
-      return (await consumeRecoveryCode(db, user.id, hashRecoveryCode(input.recoveryCode))) ? ("recovery" as const) : null;
-    }
-    return null;
-  };
+  const checkSecondFactor = (user: User, input: { code?: string; recoveryCode?: string }) =>
+    checkFactor(db, encryptionKey, user, input);
 
   /** Paso 1 de la activación: genera un secreto pendiente y devuelve los datos para el QR. */
   app.post("/auth/mfa/setup", strict, async (req, reply) => {

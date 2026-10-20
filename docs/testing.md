@@ -16,7 +16,7 @@ pnpm build
 pnpm --filter @cumplia/e2e exec playwright install chromium   # una vez
 pnpm test:e2e
 ```
-- Cubre: registro y confirmación por email, ingreso, recuperación de contraseña, MFA con código TOTP, evaluación y exportación de la SoA, registro de riesgos y mapa de calor, tema, celular, y **multi-tenant** (otra organización no ve ni abre datos ajenos; una invitación da acceso solo a la organización que invita, con su rol).
+- Cubre: registro y confirmación por email, ingreso, recuperación de contraseña, MFA con código TOTP, evaluación y exportación de la SoA, registro de riesgos y mapa de calor, corregir el nombre, exportar y eliminar la organización, tema, celular, y **multi-tenant** (otra organización no ve ni abre datos ajenos; una invitación da acceso solo a la organización que invita, con su rol).
 - Cada prueba **falla si aparece una violación de la CSP o un error de JavaScript** en el navegador; una prueba confirma que un script inyectado queda bloqueado.
 - Usa una base **temporal** (`cumplia_e2e_pw`, se recrea en cada corrida) y los puertos 3200 (API) y 3201 (web): no toca la base de desarrollo.
 - En Linux/WSL, Chromium necesita librerías del sistema: `sudo pnpm --filter @cumplia/e2e exec playwright install-deps chromium`.
