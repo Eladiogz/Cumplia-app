@@ -46,6 +46,8 @@ La API responde JSON. Desde el navegador se accede como `/api/*` a través de la
 | GET | `/auth/sessions` | Sesiones propias abiertas (todas sus organizaciones), marcando la actual |
 | DELETE | `/auth/sessions/:sessionId` | Cierra una sesión propia (la de otra cuenta → 404) |
 | POST | `/auth/sessions/revoke-others` | Cierra todas las sesiones menos la actual |
+| PATCH | `/auth/me` | `{ name }` corrige el nombre propio (el email no cambia) |
+| POST | `/auth/account/delete` | Elimina la cuenta: `{ confirmEmail, password, code? \| recoveryCode? }`. 409 si es el único ADMIN de alguna organización |
 
 ## Por organización (requieren sesión)
 | Método | Ruta | Descripción | Roles |
@@ -68,6 +70,8 @@ La API responde JSON. Desde el navegador se accede como `/api/*` a través de la
 | GET | `/risks.xlsx` | Registro en Excel | todos, con email verificado |
 | GET | `/organization` | Datos y políticas de la organización | todos |
 | PATCH | `/organization` | Cambiar nombre o exigir MFA (`requireMfa`) | ADMIN |
+| GET | `/organization/export` | ZIP con todos los datos (JSON) y los archivos de evidencia | ADMIN, con email verificado |
+| POST | `/organization/delete` | Elimina la organización, sus archivos y su auditoría: `{ confirmName, password, code? \| recoveryCode? }` | ADMIN |
 | GET | `/members` | Miembros, rol y si tienen MFA (revisión de accesos) | ADMIN, AUDITOR |
 | PATCH · DELETE | `/members/:userId` | Cambiar rol o quitar de la organización | ADMIN |
 | POST | `/members/:userId/password-reset` | Le envía a la persona un link para elegir contraseña | ADMIN |

@@ -113,6 +113,26 @@ export const mfaResetByAdminEmail = (to: string, organizationName: string) =>
     SECURITY_FOOTER,
   ]);
 
+export const accountDeletedEmail = (to: string) =>
+  message(to, "Eliminamos tu cuenta de Cumplia", [
+    "Tal como pediste, eliminamos tu cuenta de Cumplia: tus datos personales, tus sesiones y tu acceso a todas las organizaciones.",
+    "Los registros de auditoría de cada organización conservan que la cuenta existió y qué hizo, como exige su trazabilidad, pero ya sin tus datos de contacto.",
+    "Si no fuiste vos, escribinos cuanto antes a la dirección de contacto de la Política de Privacidad.",
+  ]);
+
+export const organizationDeletedEmail = (input: {
+  to: string;
+  organizationName: string;
+  deletedBy: string;
+  accountDeleted: boolean;
+}) =>
+  message(input.to, `Se eliminó ${input.organizationName} en Cumplia`, [
+    `${input.deletedBy} eliminó la organización ${input.organizationName} en Cumplia, con todos sus datos: evaluaciones, evidencia, riesgos, invitaciones y auditoría. No se puede deshacer.`,
+    input.accountDeleted
+      ? "Como no pertenecías a ninguna otra organización, también eliminamos tu cuenta y tus datos personales."
+      : "Tu cuenta sigue activa en tus otras organizaciones. Si ya no la necesitás, podés eliminarla desde Seguridad.",
+  ]);
+
 export const accountLockedEmail = (to: string, minutes: number) =>
   message(to, "Bloqueamos tu cuenta temporalmente", [
     `Hubo varios intentos fallidos de iniciar sesión en tu cuenta de Cumplia, así que la bloqueamos por ${minutes} minutos.`,

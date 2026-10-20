@@ -2,11 +2,12 @@
 
 import { useState, type FormEvent } from "react";
 import QRCode from "qrcode";
-import { KeyRound, ShieldCheck, ShieldOff } from "lucide-react";
+import { KeyRound, ShieldCheck, ShieldOff, Trash2, UserRound } from "lucide-react";
 import { ActiveSessions } from "@/components/active-sessions";
 import { Field, FormError, FormSuccess } from "@/components/form";
 import { PageHeader } from "@/components/page-header";
 import { NewPasswordField } from "@/components/password-field";
+import { CodeInput, ReauthFields, reauthReady, type Reauth } from "@/components/reauth-fields";
 import { RecoveryCodes } from "@/components/recovery-codes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,13 +21,163 @@ export default function SecurityPage() {
   const { me } = useMe();
   return (
     <>
-      <PageHeader title="Seguridad" description="Tu contraseña, la verificación en dos pasos (MFA) y dónde está abierta tu cuenta." />
+      <PageHeader
+        title="Seguridad"
+        description="Tus datos, tu contraseña, la verificación en dos pasos (MFA) y dónde está abierta tu cuenta."
+      />
       <div className="grid gap-4">
         {me.mfaEnabled ? <MfaEnabled /> : <MfaSetup />}
-        {!me.mfaSetupRequired && <ChangePassword />}
+        {!me.mfaSetupRequired && (
+          <>
+            <Profile />
+            <ChangePassword />
+          </>
+        )}
         <ActiveSessions />
+        {!me.mfaSetupRequired && <DeleteAccount />}
       </div>
     </>
+  );
+}
+
+/** Corregir el nombre propio. El email identifica la cuenta: no se cambia desde acá. */
+function Profile() {
+  const { me, refresh } = useMe();
+  const [name, setName] = useState(me.user.name ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+    setPending(true);
+    try {
+      await api("/auth/me", { method: "PATCH", body: { name: name.trim() } });
+      setSuccess("Guardamos tu nombre.");
+      await refresh();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <UserRound className="size-4 text-primary" aria-hidden /> Tus datos
+        </CardTitle>
+        <CardDescription>Tu nombre aparece para los demás miembros y en las invitaciones que envíes.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={submit} className="grid max-w-md gap-4">
+          <FormError message={error} />
+          <FormSuccess message={success} />
+          <Field id="profile-email" label="Email">
+            <Input id="profile-email" type="email" value={me.user.email} disabled readOnly />
+          </Field>
+          <Field id="profile-name" label="Nombre y apellido">
+            <Input
+              id="profile-name"
+              autoComplete="name"
+              required
+              maxLength={100}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </Field>
+          <div>
+            <Button type="submit" variant="outline" disabled={pending || !name.trim() || name.trim() === (me.user.name ?? "")}>
+              {pending ? "Guardando…" : "Guardar"}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Eliminar la propia cuenta (irreversible). La API no lo permite si la persona es el
+ * único ADMIN de alguna organización y explica qué hacer antes.
+ */
+function DeleteAccount() {
+  const { me } = useMe();
+  const [open, setOpen] = useState(false);
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const [reauth, setReauth] = useState<Reauth>({ password: "" });
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setPending(true);
+    try {
+      await api("/auth/account/delete", { body: { confirmEmail: confirmEmail.trim().toLowerCase(), ...reauth } });
+      window.location.assign("/ingresar?aviso=cuenta-eliminada");
+    } catch (err) {
+      setError(errorMessage(err));
+      setPending(false);
+    }
+  };
+
+  return (
+    <Card className="border-destructive/40">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Trash2 className="size-4 text-destructive" aria-hidden /> Eliminar tu cuenta
+        </CardTitle>
+        <CardDescription>
+          Borra tus datos personales, tus sesiones y tu acceso a todas tus organizaciones. No se puede deshacer. Lo que
+          cargaste en cada organización (evaluaciones, evidencia, riesgos) es de la organización y queda; su registro de
+          auditoría conserva tus acciones.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {!open ? (
+          <Button variant="outline" className="text-destructive" onClick={() => setOpen(true)}>
+            Eliminar mi cuenta…
+          </Button>
+        ) : (
+          <form onSubmit={submit} className="grid max-w-md gap-4">
+            <FormError message={error} />
+            <p className="text-sm text-muted-foreground">
+              Si sos el único administrador de una organización, antes nombrá a otra persona como administradora o eliminá
+              la organización (desde Organización, donde también podés exportar sus datos).
+            </p>
+            <Field id="delete-account-email" label={`Escribí tu email (${me.user.email}) para confirmar`}>
+              <Input
+                id="delete-account-email"
+                type="email"
+                autoComplete="off"
+                required
+                value={confirmEmail}
+                onChange={(e) => setConfirmEmail(e.target.value)}
+              />
+            </Field>
+            <ReauthFields idPrefix="delete-account" mfaEnabled={me.mfaEnabled} value={reauth} onChange={setReauth} />
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={
+                  pending || confirmEmail.trim().toLowerCase() !== me.user.email || !reauthReady(reauth, me.mfaEnabled)
+                }
+              >
+                {pending ? "Eliminando…" : "Eliminar mi cuenta para siempre"}
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -105,24 +256,6 @@ function ChangePassword() {
         </form>
       </CardContent>
     </Card>
-  );
-}
-
-/** Código de 6 dígitos de la app de autenticación. */
-function CodeInput({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <Input
-      id={id}
-      inputMode="numeric"
-      autoComplete="one-time-code"
-      pattern="\d{6}"
-      maxLength={6}
-      placeholder="123456"
-      required
-      className="max-w-40 text-center font-mono tracking-[0.3em]"
-      value={value}
-      onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
-    />
   );
 }
 

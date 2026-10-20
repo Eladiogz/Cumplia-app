@@ -6,18 +6,23 @@ import {
   deleteOtherSessionsForUser,
   deleteSession,
   deleteSessionOfUser,
+  deleteUserAccount,
   findInvitationByToken,
   forOrganization,
   listMembershipsForUser,
   listSessionsForUser,
   recordForAllMemberships,
   registerFromInvitation,
+  updateUserName,
   type Db,
 } from "@cumplia/db";
+import { notify, type Mailer } from "../email/mailer.js";
+import { accountDeletedEmail } from "../email/templates.js";
 import { hashPassword } from "../security/password.js";
 import { assertStrongPassword } from "../security/password-policy.js";
-import { currentSession, hashToken, startSession } from "../security/session.js";
-import { NewPassword, PersonName } from "./schemas.js";
+import { ReauthBody, confirmIdentity } from "../security/reauth.js";
+import { SESSION_COOKIE, currentSession, hashToken, startSession } from "../security/session.js";
+import { Email, NewPassword, PersonName } from "./schemas.js";
 
 const Token = z.string().trim().min(20).max(200);
 const PreviewBody = z.object({ token: Token });
@@ -29,6 +34,9 @@ const AcceptBody = z.object({
 });
 const SwitchBody = z.object({ organizationId: z.string().uuid() });
 const SessionParams = z.object({ sessionId: z.string().uuid() });
+const ProfileBody = z.object({ name: PersonName });
+// Escribir el propio email confirma que se entiende qué cuenta se elimina.
+const DeleteAccountBody = ReauthBody.extend({ confirmEmail: Email });
 
 const INVALID_INVITATION = "La invitación no es válida o ya venció";
 
@@ -36,13 +44,16 @@ interface Options {
   db: Db;
   secureCookies: boolean;
   authRateLimit: number;
+  mailer: Mailer;
+  /** Para verificar el código MFA al eliminar la cuenta (sin ella, quien tiene MFA no puede). */
+  encryptionKey?: Buffer;
 }
 
 /**
  * Rutas de la cuenta que no dependen de la organización activa: aceptar
- * invitaciones y elegir con qué organización trabajar.
+ * invitaciones, elegir con qué organización trabajar y los datos propios.
  */
-export async function accountRoutes(app: FastifyInstance, { db, secureCookies, authRateLimit }: Options) {
+export async function accountRoutes(app: FastifyInstance, { db, secureCookies, authRateLimit, mailer, encryptionKey }: Options) {
   const strict = { config: { rateLimit: { max: authRateLimit, timeWindow: "1 minute" } } };
 
   /** Abre una sesión en `organizationId` y, si había otra, la cierra (rotación de token). */
@@ -165,5 +176,42 @@ export async function accountRoutes(app: FastifyInstance, { db, secureCookies, a
     await moveSession(req, reply, current.user.id, organizationId, current.tokenHash);
     await forOrganization(db, organizationId, current.user.id).record("auth.switch_organization", "user", current.user.id);
     return { organization: { id: target.organizationId, name: target.organizationName }, role: target.role };
+  });
+
+  /** Corregir el nombre propio (derecho de rectificación). El email identifica la cuenta y no cambia. */
+  app.patch("/auth/me", async (req, reply) => {
+    const current = await currentSession(db, req);
+    if (!current) return reply.code(401).send({ error: "No autenticado" });
+    const { name } = ProfileBody.parse(req.body);
+    const user = await updateUserName(db, current.user.id, name);
+    return { user };
+  });
+
+  /**
+   * Eliminar la propia cuenta (derecho de supresión). Pide contraseña y, con MFA, un
+   * código: una sesión robada no alcanza. Si la persona es el único ADMIN de alguna
+   * organización, responde 409 con qué hacer antes.
+   */
+  app.post("/auth/account/delete", strict, async (req, reply) => {
+    const current = await currentSession(db, req);
+    if (!current) return reply.code(401).send({ error: "No autenticado" });
+    const { user, session } = current;
+    const body = DeleteAccountBody.parse(req.body);
+    if (body.confirmEmail !== user.email) {
+      return reply.code(400).send({ error: "Escribí el email de tu cuenta para confirmar" });
+    }
+    if (!(await confirmIdentity({ db, mailer, log: req.log, encryptionKey }, user, body))) {
+      await forOrganization(db, session.organizationId, user.id).record("user.account_delete_failed", "user", user.id);
+      return reply.code(403).send({ error: "No se pudo verificar tu identidad" });
+    }
+    try {
+      await deleteUserAccount(db, user.id);
+    } catch (e) {
+      if (e instanceof ConflictError) return reply.code(409).send({ error: e.message });
+      throw e;
+    }
+    reply.clearCookie(SESSION_COOKIE, { path: "/" });
+    notify(mailer, req.log, accountDeletedEmail(user.email));
+    return reply.code(204).send();
   });
 }

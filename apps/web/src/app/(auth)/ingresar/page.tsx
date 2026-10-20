@@ -3,16 +3,26 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
-import { Field, FormError } from "@/components/form";
+import { Field, FormError, FormSuccess } from "@/components/form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { api, errorMessage } from "@/lib/api";
 import { safeNext } from "@/lib/navigation";
 
+/** Avisos después de eliminar algo (texto fijo: del link solo se toma la clave). */
+const NOTICES: Record<string, string> = {
+  "cuenta-eliminada": "Eliminamos tu cuenta. Te enviamos una confirmación por email.",
+  "organizacion-eliminada":
+    "Eliminamos la organización con todos sus datos. Si pertenecés a otras organizaciones, podés ingresar para seguir con ellas; si no, también eliminamos tu cuenta.",
+};
+
 function LoginForm() {
   const router = useRouter();
-  const next = safeNext(useSearchParams().get("siguiente"));
+  const params = useSearchParams();
+  const next = safeNext(params.get("siguiente"));
+  const aviso = params.get("aviso") ?? "";
+  const notice = Object.hasOwn(NOTICES, aviso) ? NOTICES[aviso]! : null;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +54,7 @@ function LoginForm() {
       </CardHeader>
       <CardContent>
         <form onSubmit={submit} className="grid gap-4" noValidate={false}>
+          <FormSuccess message={error ? null : notice} />
           <FormError message={error} />
           <Field id="email" label="Email">
             <Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />

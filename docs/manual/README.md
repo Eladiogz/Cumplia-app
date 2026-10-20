@@ -4,8 +4,8 @@ Cumplia te ayuda a saber dónde está tu organización frente a la norma **ISO/I
 
 ## Capítulos
 1. [Primeros pasos](01-primeros-pasos.md): crear la cuenta, confirmar el email, conocer la pantalla e ingresar.
-2. [Seguridad de tu cuenta](02-seguridad.md): verificación en dos pasos, códigos de recuperación, contraseña y sesiones.
-3. [Tu organización y tu equipo](03-equipo.md): roles, invitar personas, aceptar invitaciones y trabajar con varias organizaciones.
+2. [Seguridad de tu cuenta](02-seguridad.md): verificación en dos pasos, códigos de recuperación, contraseña, sesiones, tus datos y eliminar tu cuenta.
+3. [Tu organización y tu equipo](03-equipo.md): roles, invitar personas, aceptar invitaciones, trabajar con varias organizaciones, y exportar o eliminar los datos de la organización.
 4. [Evaluación ISO 27001](04-evaluacion.md): responder los controles, cargar evidencia, ver el resultado y exportar la Declaración de Aplicabilidad.
 5. [Registro de riesgos](05-riesgos.md): registrar, evaluar y tratar riesgos con la matriz 5×5 y el mapa de calor.
 6. [Preguntas frecuentes](06-preguntas-frecuentes.md).

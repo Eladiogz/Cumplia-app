@@ -55,7 +55,14 @@ Definida una sola vez en `@cumplia/core/password` (la web guía con medidor y li
 
 ## Auditoría
 - Cada cambio de datos de negocio deja un registro en la misma transacción, con detalle (p. ej. rol anterior y nuevo), **nunca secretos**.
-- `audit_logs` es inalterable: un trigger impide modificarla o borrarla y el rol de la API no tiene esos permisos.
+- `audit_logs` es inalterable: un trigger impide modificarla o borrarla y el rol de la API no tiene esos permisos. **Única excepción:** eliminar la organización completa (ver abajo), que lo hace una función de la base y deja constancia en `organization_deletions`.
+
+## Derechos sobre los datos (Ley 25.326)
+- **Rectificación**: cada persona corrige su nombre (`PATCH /auth/me`); sin links, como en el registro.
+- **Supresión de la cuenta** (`POST /auth/account/delete`): exige escribir el email, la contraseña y, con MFA, un código (una sesión robada no alcanza; los fallos cuentan para el bloqueo). Nunca deja una organización sin ADMIN. Borra la cuenta y, en cascada, membresías, sesiones, tokens y MFA. En la auditoría de cada organización queda `user.account_deleted`.
+- **Portabilidad** (`GET /organization/export`): ZIP con todos los datos de la organización en JSON y los archivos de evidencia. Solo ADMIN con email verificado; auditado. Nunca incluye hashes de tokens, contraseñas, secretos MFA ni claves internas de archivos.
+- **Supresión de la organización** (`POST /organization/delete`): ADMIN; exige el nombre exacto, la contraseña y, con MFA, un código. Borra primero los archivos del almacenamiento (si falla, la organización sigue entera) y después todo en una transacción con `app_purge_organization` (`SECURITY DEFINER`). La función solo acepta la organización fijada en la transacción (la de la sesión): un error en la API no puede borrar otra. También borra las cuentas que quedan sin ninguna organización (no podrían volver a ingresar). Avisa por email a todos los miembros.
+- Límite de 10 por minuto por IP (como el ingreso) en eliminar y exportar.
 
 ## Cadena de suministro
 - Dependencias con versión fijada y `pnpm install --frozen-lockfile` en CI; `pnpm audit` en cada build (las dependencias de producción, sin vulnerabilidades conocidas).

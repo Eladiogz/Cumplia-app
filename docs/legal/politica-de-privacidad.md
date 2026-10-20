@@ -1,6 +1,6 @@
 # Política de Privacidad de Cumplia
 
-> **BORRADOR — versión 0.1 (19 de octubre de 2026). No publicar antes de que lo revise un abogado matriculado.** Los datos entre corchetes `[●]` se completan antes de publicarla. Debe ser coherente con los [Términos y Condiciones](terminos-y-condiciones.md).
+> **BORRADOR — versión 0.2 (20 de octubre de 2026). No publicar antes de que lo revise un abogado matriculado.** Los datos entre corchetes `[●]` se completan antes de publicarla. Debe ser coherente con los [Términos y Condiciones](terminos-y-condiciones.md).
 
 **Última actualización:** [●]
 
@@ -66,11 +66,12 @@ Algunos proveedores pueden alojar datos fuera de la Argentina **[●indicar paí
 
 | Datos | Plazo |
 |---|---|
-| Cuenta y credenciales | Mientras tengas cuenta. Al eliminarla, se borran dentro de los **[●30] días** |
+| Cuenta y credenciales | Mientras tengas cuenta. Si la eliminás desde **Seguridad**, se borra en el momento de los sistemas activos (y de las copias de seguridad al completarse su rotación). También se elimina si la única organización a la que pertenecías se elimina |
+| Tus acciones en el registro de auditoría de una organización | Mientras exista la organización, aunque elimines tu cuenta: la organización las necesita para su trazabilidad. Quedan asociadas a un identificador interno; algunos eventos pueden incluir tu email (por ejemplo, la invitación que recibiste) |
 | Sesiones (IP, navegador) | Hasta que la sesión vence: como máximo **7 días**, o **12 horas sin uso**. Después se eliminan |
 | Links de un solo uso (confirmación de email, recuperación de contraseña, invitaciones) | Vencen entre **30 minutos y 7 días**. Se guarda solo una huella irreversible del link |
 | Emails pendientes de envío | Se borran apenas se envían. Si no se pudieron enviar, se borra el contenido y se conserva solo el registro del error por **30 días** |
-| Registro de auditoría de una organización | Mientras exista la organización. Al terminar el contrato con el cliente, se elimina junto con sus datos (Términos y Condiciones, sección 13.4) |
+| Datos y registro de auditoría de una organización | Mientras exista la organización. Si su Administrador/a la elimina desde la aplicación, se borran en el momento (de las copias de seguridad, al completarse su rotación). Al terminar el contrato con el cliente, se eliminan según la sección 13.4 de los Términos y Condiciones |
 | Copias de seguridad | Se eliminan al completar su ciclo de rotación, que no supera los **[●90] días** |
 | Facturación | El plazo que exija la ley impositiva |
 
@@ -110,7 +111,14 @@ Como titular de los datos tenés derecho a:
 - **suprimirlos** cuando corresponda;
 - **retirar tu consentimiento** cuando el tratamiento se base en él (arts. 14 a 16 de la Ley 25.326).
 
-Podés cambiar tu contraseña y ver o cerrar tus sesiones desde **Seguridad** en la aplicación. Para todo lo demás, escribinos a **[●privacidad@dominio]** desde el email de tu cuenta. Responderemos:
+Muchos los podés ejercer vos mismo desde la aplicación, en **Seguridad**:
+- **corregir tu nombre**;
+- cambiar tu contraseña y ver o cerrar tus sesiones;
+- **eliminar tu cuenta**. Si sos el único Administrador/a de una organización, antes tenés que nombrar a otra persona o eliminar la organización.
+
+El Administrador/a de cada organización puede, desde **Organización**, **exportar todos sus datos** (un archivo con evaluaciones, evidencia, riesgos, miembros y auditoría) y **eliminar la organización** con todos ellos.
+
+Para todo lo demás (por ejemplo, una copia de tus datos personales o cambiar el email de tu cuenta), escribinos a **[●privacidad@dominio]** desde el email de tu cuenta. Responderemos:
 - dentro de los **10 días corridos** las solicitudes de acceso;
 - dentro de los **5 días hábiles** las de rectificación, actualización o supresión;
 

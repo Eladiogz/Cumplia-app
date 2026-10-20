@@ -61,7 +61,7 @@ Cumplia puede suspender el acceso que viole esta sección, en la medida necesari
 
 5.3. **Exactitud y licitud.** El Cliente es responsable de la exactitud de los Datos del Cliente y de contar con base legal para tratar los datos personales que cargue (por ejemplo, los de sus empleados o proveedores).
 
-5.4. **Respaldo propio.** Cumplia hace copias de seguridad (Anexo A), pero el Cliente puede exportar sus reportes en cualquier momento y se le recomienda conservar copias de la documentación crítica.
+5.4. **Respaldo propio.** Cumplia hace copias de seguridad (Anexo A), pero el Cliente puede exportar sus reportes y **todos sus Datos del Cliente** (Organización → Datos de la organización) en cualquier momento, y se le recomienda conservar copias de la documentación crítica.
 
 ## 6. Protección de datos personales
 
@@ -163,6 +163,8 @@ La suspensión se limitará a lo necesario y se informará al Cliente con su mot
 - (a) durante **30 días** el Cliente podrá exportar sus Datos del Cliente;
 - (b) vencido ese plazo, Cumplia **eliminará** los Datos del Cliente de sus sistemas activos dentro de los **90 días** siguientes. Las copias de seguridad se eliminan al completarse su ciclo de rotación, que no superará **[●90] días** adicionales. Mientras tanto se mantienen protegidas y no se usan;
 - (c) a pedido del Cliente, Cumplia certificará por escrito la eliminación.
+
+El Administrador/a del Cliente también puede eliminar la organización con todos sus Datos del Cliente en cualquier momento desde el Servicio. La eliminación es inmediata en los sistemas activos e irreversible; las copias de seguridad siguen el plazo del punto (b).
 
 Cumplia podrá conservar solo lo que la ley le exija (por ejemplo, la información de facturación), protegido y por el plazo legal.
 

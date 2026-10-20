@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { KeyRound, LogOut, MailPlus, MoreHorizontal, ShieldCheck, ShieldOff, Trash2, X } from "lucide-react";
+import { Download, KeyRound, LogOut, MailPlus, MoreHorizontal, ShieldCheck, ShieldOff, Trash2, X } from "lucide-react";
 import { Field, FormError, FormSuccess, Spinner } from "@/components/form";
 import { PageHeader } from "@/components/page-header";
+import { ReauthFields, reauthReady, type Reauth } from "@/components/reauth-fields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,8 +44,121 @@ export default function OrganizationPage() {
             </CardContent>
           </Card>
         )}
+        {canManageMembers(me.role) && <OrganizationData />}
       </div>
     </>
+  );
+}
+
+/**
+ * Los datos son de la organización: el ADMIN puede llevárselos (ZIP) o eliminarlos por
+ * completo. Ambas cosas quedan registradas; eliminar pide nombre, contraseña y MFA.
+ */
+function OrganizationData() {
+  const { me } = useMe();
+  const [org, setOrg] = useState<Organization | null>(null);
+  const [open, setOpen] = useState(false);
+  const [confirmName, setConfirmName] = useState("");
+  const [reauth, setReauth] = useState<Reauth>({ password: "" });
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    api<Organization>("/organization")
+      .then(setOrg)
+      .catch((e: unknown) => setError(errorMessage(e)));
+  }, []);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setPending(true);
+    try {
+      await api("/organization/delete", { body: { confirmName: confirmName.trim(), ...reauth } });
+      window.location.assign("/ingresar?aviso=organizacion-eliminada");
+    } catch (err) {
+      setError(errorMessage(err));
+      setPending(false);
+    }
+  };
+
+  return (
+    <Card className="border-destructive/40">
+      <CardHeader>
+        <CardTitle>Datos de la organización</CardTitle>
+        <CardDescription>Exportá todo lo cargado o eliminá la organización de Cumplia.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-md border p-4">
+          <div className="grid gap-1">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <Download className="size-4 text-primary" aria-hidden /> Exportar todos los datos
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Un ZIP con evaluaciones, respuestas, evidencia (con sus archivos), riesgos, miembros, invitaciones y el
+              registro de auditoría completo, en formato JSON.
+            </p>
+          </div>
+          {me.emailVerified ? (
+            <Button variant="outline" asChild>
+              <a href="/api/organization/export" download>
+                <Download aria-hidden /> Descargar ZIP
+              </a>
+            </Button>
+          ) : (
+            <Button variant="outline" disabled title="Confirmá tu email para exportar">
+              <Download aria-hidden /> Descargar ZIP
+            </Button>
+          )}
+        </div>
+
+        <div className="grid gap-4 rounded-md border border-destructive/40 p-4">
+          <div className="grid gap-1">
+            <p className="flex items-center gap-2 text-sm font-medium text-destructive">
+              <Trash2 className="size-4" aria-hidden /> Eliminar la organización
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Borra para siempre evaluaciones, evidencia y archivos, riesgos, invitaciones, accesos y el registro de
+              auditoría. Avisamos por email a todos los miembros. Las cuentas que no pertenezcan a otra organización
+              (incluida la tuya, si esta es la única) también se eliminan. Exportá los datos antes si los vas a necesitar.
+            </p>
+          </div>
+          {!open ? (
+            <div>
+              <Button variant="outline" className="text-destructive" onClick={() => setOpen(true)}>
+                Eliminar la organización…
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={submit} className="grid max-w-md gap-4">
+              <FormError message={error} />
+              <Field id="delete-org-name" label={`Escribí el nombre de la organización (${org?.name ?? "…"}) para confirmar`}>
+                <Input
+                  id="delete-org-name"
+                  autoComplete="off"
+                  required
+                  value={confirmName}
+                  onChange={(e) => setConfirmName(e.target.value)}
+                />
+              </Field>
+              <ReauthFields idPrefix="delete-org" mfaEnabled={me.mfaEnabled} value={reauth} onChange={setReauth} />
+              <div className="flex gap-2">
+                <Button
+                  type="submit"
+                  variant="destructive"
+                  disabled={pending || !org || confirmName.trim() !== org.name.trim() || !reauthReady(reauth, me.mfaEnabled)}
+                >
+                  {pending ? "Eliminando…" : "Eliminar para siempre"}
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                  Cancelar
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

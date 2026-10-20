@@ -162,11 +162,11 @@ export function buildApp({
   if (db) {
     app.register(authRoutes, { db, secureCookies, authRateLimit, mailer, mfaCookiePath, appUrl });
     app.register(passwordRoutes, { db, mailer, appUrl, authRateLimit });
-    app.register(accountRoutes, { db, secureCookies, authRateLimit });
+    app.register(accountRoutes, { db, secureCookies, authRateLimit, mailer, encryptionKey: mfaEncryptionKey });
     if (mfaEncryptionKey) {
       app.register(mfaRoutes, { db, secureCookies, authRateLimit, encryptionKey: mfaEncryptionKey, mailer, mfaCookiePath });
     }
-    app.register(protectedRoutes, { db, resolveTenant, mailer, appUrl, storage });
+    app.register(protectedRoutes, { db, resolveTenant, mailer, appUrl, storage, encryptionKey: mfaEncryptionKey, authRateLimit });
   }
 
   return app;
