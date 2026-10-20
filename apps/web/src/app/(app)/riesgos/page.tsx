@@ -259,7 +259,7 @@ function LevelSummary({ risks, mode }: { risks: Risk[]; mode: MatrixMode }) {
 
 function Owner({ r }: { r: Risk }) {
   if (!r.ownerEmail) return <span className="text-muted-foreground">Sin asignar</span>;
-  return <span className="break-all">{r.ownerName ?? r.ownerEmail}</span>;
+  return <span title={r.ownerEmail}>{r.ownerName ?? r.ownerEmail}</span>;
 }
 
 function Due({ r }: { r: Risk }) {
@@ -321,10 +321,8 @@ function RiskList({ risks }: { risks: Risk[] }) {
                 <th className="px-4 py-3 font-medium">Riesgo</th>
                 <th className="px-4 py-3 font-medium">Inherente</th>
                 <th className="px-4 py-3 font-medium">Residual</th>
-                <th className="px-4 py-3 font-medium">Tratamiento</th>
-                <th className="px-4 py-3 font-medium">Estado</th>
-                <th className="px-4 py-3 font-medium">Responsable</th>
-                <th className="px-4 py-3 font-medium">Vence</th>
+                <th className="px-4 py-3 font-medium">Estado · tratamiento</th>
+                <th className="px-4 py-3 font-medium">Responsable · vence</th>
               </tr>
             </thead>
             <tbody>
@@ -334,7 +332,7 @@ function RiskList({ risks }: { risks: Risk[] }) {
                 return (
                   <tr key={r.id} className="border-b align-top last:border-0 hover:bg-muted/50">
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground tabular-nums">{riskCode(r.number)}</td>
-                    <td className="min-w-64 px-4 py-3">
+                    <td className="min-w-56 px-4 py-3">
                       <Link href={`/riesgos/${r.id}`} className="font-medium text-primary underline-offset-4 hover:underline [overflow-wrap:anywhere]">
                         {r.title}
                       </Link>
@@ -346,13 +344,19 @@ function RiskList({ risks }: { risks: Risk[] }) {
                     <td className="px-4 py-3">
                       {residual ? <RiskLevelBadge level={residual.level} score={residual.score} /> : <span className="text-muted-foreground">—</span>}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">{RISK_TREATMENT_LABEL[r.treatment]}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{RISK_STATUS_LABEL[r.status]}</td>
-                    <td className="px-4 py-3 max-w-40">
-                      <Owner r={r} />
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div>{RISK_STATUS_LABEL[r.status]}</div>
+                      <div className="text-xs text-muted-foreground">{RISK_TREATMENT_LABEL[r.treatment]}</div>
                     </td>
-                    <td className="px-4 py-3">
-                      <Due r={r} />
+                    <td className="max-w-48 px-4 py-3">
+                      <div className="truncate">
+                        <Owner r={r} />
+                      </div>
+                      {r.dueDate && (
+                        <div className="text-xs">
+                          <Due r={r} />
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );

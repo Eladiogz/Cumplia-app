@@ -12,6 +12,7 @@ import {
   memberships,
   mfaChallenges,
   organizations,
+  risks,
   sessions,
   users,
   type AuditDetails,
@@ -37,6 +38,13 @@ export async function createOrganization(db: Db, name: string) {
 }
 
 export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/** En una exportación, organization_id es redundante (todo es de la misma organización). */
+function withoutOrganizationId<T extends { organizationId: string }>(row: T): Omit<T, "organizationId"> {
+  const copy: Partial<T> = { ...row };
+  delete copy.organizationId;
+  return copy as Omit<T, "organizationId">;
+}
 
 /** Archivo de una evidencia, ya guardado en el almacenamiento por la API. */
 export interface EvidenceFile {
@@ -504,6 +512,120 @@ export function forOrganization(db: Db, organizationId: string, actorId: string 
           .where(and(eq(invitations.organizationId, organizationId), pending, gt(invitations.expiresAt, sql`now()`)))
           .orderBy(desc(invitations.createdAt)),
       );
+    },
+
+    /**
+     * TODOS los datos de la organización, para entregárselos (portabilidad, fin del
+     * servicio). Nunca hashes de tokens ni secretos. Las claves de los archivos van
+     * aparte (`files`) para que la API los lea del almacenamiento.
+     */
+    async exportData() {
+      return inTenant(async (tx) => {
+        const [organization] = await tx
+          .select({ id: organizations.id, name: organizations.name, requireMfa: organizations.requireMfa, createdAt: organizations.createdAt })
+          .from(organizations)
+          .where(eq(organizations.id, organizationId));
+        if (!organization) throw new NotFoundError("Organización");
+        const members = await tx
+          .select({ userId: users.id, email: users.email, name: users.name, role: memberships.role })
+          .from(memberships)
+          .innerJoin(users, eq(users.id, memberships.userId))
+          .where(eq(memberships.organizationId, organizationId))
+          .orderBy(asc(users.email));
+        const invitationRows = await tx
+          .select({ ...invitationPublicColumns, acceptedAt: invitations.acceptedAt, revokedAt: invitations.revokedAt })
+          .from(invitations)
+          .where(eq(invitations.organizationId, organizationId))
+          .orderBy(asc(invitations.createdAt));
+        const assessmentRows = await tx
+          .select()
+          .from(assessments)
+          .where(eq(assessments.organizationId, organizationId))
+          .orderBy(asc(assessments.createdAt));
+        const answerRows = await tx
+          .select()
+          .from(controlAnswers)
+          .where(eq(controlAnswers.organizationId, organizationId))
+          .orderBy(asc(controlAnswers.controlId));
+        const evidenceRows = await tx
+          .select({ ...evidencePublicColumns, fileKey: evidence.fileKey, controlAnswerId: evidence.controlAnswerId })
+          .from(evidence)
+          .where(eq(evidence.organizationId, organizationId))
+          .orderBy(asc(evidence.collectedAt));
+        const riskRows = await tx.select().from(risks).where(eq(risks.organizationId, organizationId)).orderBy(asc(risks.number));
+        const auditRows = await tx
+          .select()
+          .from(auditLogs)
+          .where(eq(auditLogs.organizationId, organizationId))
+          .orderBy(asc(auditLogs.createdAt));
+
+        const files: { evidenceId: string; key: string; fileName: string; assessmentId: string }[] = [];
+        const exportedAssessments = assessmentRows.map((a) => ({
+          ...withoutOrganizationId(a),
+          answers: answerRows
+            .filter((ans) => ans.assessmentId === a.id)
+            .map((ans) => ({
+              controlId: ans.controlId,
+              applicable: ans.applicable,
+              maturity: ans.maturity,
+              justification: ans.justification,
+              evidence: evidenceRows
+                .filter((e) => e.controlAnswerId === ans.id)
+                .map((e) => {
+                  if (e.fileKey && e.fileName) files.push({ evidenceId: e.id, key: e.fileKey, fileName: e.fileName, assessmentId: a.id });
+                  return {
+                    id: e.id,
+                    source: e.source,
+                    description: e.description,
+                    fileName: e.fileName,
+                    fileSize: e.fileSize,
+                    contentType: e.contentType,
+                    sha256: e.sha256,
+                    collectedAt: e.collectedAt,
+                  };
+                }),
+            })),
+        }));
+
+        await audit(tx, "organization.exported", "organization", organizationId, {
+          assessments: assessmentRows.length,
+          risks: riskRows.length,
+          files: files.length,
+        });
+        return {
+          organization,
+          members,
+          invitations: invitationRows,
+          assessments: exportedAssessments,
+          risks: riskRows.map(withoutOrganizationId),
+          auditLog: auditRows.map(withoutOrganizationId),
+          files,
+        };
+      });
+    },
+
+    /** Claves de todos los archivos de evidencia (para borrarlos del almacenamiento). */
+    listEvidenceFileKeys() {
+      return inTenant(async (tx) => {
+        const rows = await tx
+          .select({ key: evidence.fileKey })
+          .from(evidence)
+          .where(and(eq(evidence.organizationId, organizationId), sql`${evidence.fileKey} is not null`));
+        return rows.map((r) => r.key!);
+      });
+    },
+
+    /**
+     * Elimina la organización con todos sus datos y su auditoría (irreversible). Lo
+     * hace la función app_purge_organization de la base, que además verifica que sea
+     * la organización fijada en la transacción. Devuelve las cuentas que también se
+     * borraron por no pertenecer a ninguna otra organización.
+     */
+    async purgeOrganization() {
+      const res = (await inTenant((tx) =>
+        tx.execute(sql`select app_purge_organization(${organizationId}::uuid, ${actorId}::uuid) as id`),
+      )) as unknown as { rows: { id: string }[] };
+      return { deletedAccounts: res.rows.map((r) => r.id) };
     },
 
     async revokeInvitation(invitationId: string, reason?: string) {

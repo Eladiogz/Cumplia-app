@@ -20,17 +20,54 @@ const formatDate = (d: Date) =>
 
 const SIGNATURE = "— Cumplia";
 
-/** Arma texto plano y HTML a partir de párrafos (el HTML se escapa salvo el botón). */
+const NAVY = "#1f3a5f";
+const FONT = "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+
+/**
+ * HTML de email con la identidad de Cumplia: tablas y estilos en línea (lo único que
+ * respetan todos los clientes de correo), sin imágenes externas (no se bloquean y no
+ * permiten rastrear la apertura). Todo texto llega ya escapado.
+ */
+function layout(title: string, body: string) {
+  return `<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>
+<body style="margin:0;padding:0;background:#eef2f7">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f7;padding:24px 12px">
+<tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;font-family:${FONT}">
+<tr><td style="background:${NAVY};border-radius:10px 10px 0 0;padding:18px 28px">
+<span style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.2px">Cumplia</span>
+</td></tr>
+<tr><td style="background:#ffffff;padding:28px;color:#1f2937;font-size:15px;line-height:1.55">
+${body}
+</td></tr>
+<tr><td style="padding:16px 28px;color:#6b7280;font-size:12px;line-height:1.5;text-align:center">
+Cumplimiento sin planillas · Recibiste este email por tu cuenta en Cumplia.<br>Nunca te vamos a pedir tu contraseña ni tus códigos por email.
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
+}
+
+/** Arma texto plano y HTML a partir de párrafos (todo se escapa; el botón lleva una URL nuestra). */
 function message(to: string, subject: string, paragraphs: string[], action?: { label: string; url: string }): EmailMessage {
   const text = [...paragraphs, ...(action ? [`${action.label}: ${action.url}`] : []), SIGNATURE].join("\n\n");
-  const html = [
-    ...paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`),
-    ...(action
-      ? [`<p><a href="${escapeHtml(action.url)}" style="background:#1f4e79;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">${escapeHtml(action.label)}</a></p>`]
-      : []),
-    `<p style="color:#666">${SIGNATURE}</p>`,
+  const button = action
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0"><tr><td style="background:${NAVY};border-radius:6px">
+<a href="${escapeHtml(action.url)}" style="display:inline-block;padding:12px 22px;color:#ffffff;font-weight:600;font-size:15px;text-decoration:none">${escapeHtml(action.label)}</a>
+</td></tr></table>
+<p style="margin:0 0 16px;font-size:12px;color:#6b7280">Si el botón no funciona, copiá este link en tu navegador:<br><span style="word-break:break-all;color:${NAVY}">${escapeHtml(action.url)}</span></p>`
+    : "";
+  const [first, ...rest] = paragraphs;
+  const body = [
+    ...(first ? [`<p style="margin:0 0 16px">${escapeHtml(first)}</p>`] : []),
+    // El botón va después del primer párrafo: es la acción principal del email.
+    button,
+    ...rest.map((p) => `<p style="margin:0 0 16px">${escapeHtml(p)}</p>`),
+    `<p style="margin:24px 0 0;color:#6b7280">${SIGNATURE}</p>`,
   ].join("\n");
-  return { to, subject: oneLine(subject), text, html };
+  return { to, subject: oneLine(subject), text, html: layout(escapeHtml(oneLine(subject)), body) };
 }
 
 const SECURITY_FOOTER = "Si no fuiste vos, cambiá tu contraseña y avisale al administrador de tu organización.";
@@ -111,6 +148,26 @@ export const mfaResetByAdminEmail = (to: string, organizationName: string) =>
     `Un administrador de ${organizationName} restableció la verificación en dos pasos (MFA) de tu cuenta y cerró tus sesiones.`,
     "La próxima vez que ingreses vas a poder (o tener que) configurarla de nuevo con tu app de autenticación.",
     SECURITY_FOOTER,
+  ]);
+
+export const accountDeletedEmail = (to: string) =>
+  message(to, "Eliminamos tu cuenta de Cumplia", [
+    "Tal como pediste, eliminamos tu cuenta de Cumplia: tus datos personales, tus sesiones y tu acceso a todas las organizaciones.",
+    "Los registros de auditoría de cada organización conservan que la cuenta existió y qué hizo, como exige su trazabilidad, pero ya sin tus datos de contacto.",
+    "Si no fuiste vos, escribinos cuanto antes a la dirección de contacto de la Política de Privacidad.",
+  ]);
+
+export const organizationDeletedEmail = (input: {
+  to: string;
+  organizationName: string;
+  deletedBy: string;
+  accountDeleted: boolean;
+}) =>
+  message(input.to, `Se eliminó ${input.organizationName} en Cumplia`, [
+    `${input.deletedBy} eliminó la organización ${input.organizationName} en Cumplia, con todos sus datos: evaluaciones, evidencia, riesgos, invitaciones y auditoría. No se puede deshacer.`,
+    input.accountDeleted
+      ? "Como no pertenecías a ninguna otra organización, también eliminamos tu cuenta y tus datos personales."
+      : "Tu cuenta sigue activa en tus otras organizaciones. Si ya no la necesitás, podés eliminarla desde Seguridad.",
   ]);
 
 export const accountLockedEmail = (to: string, minutes: number) =>
