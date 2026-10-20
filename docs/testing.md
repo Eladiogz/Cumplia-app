@@ -22,6 +22,16 @@ pnpm test:e2e
 - En Linux/WSL, Chromium necesita librerías del sistema: `sudo pnpm --filter @cumplia/e2e exec playwright install-deps chromium`.
 - Para los avisos de la app usá el helper `appAlert()`, **no** `getByRole("alert")`: Next.js agrega su propio `role="alert"` (anunciador de rutas) y la prueba pasaría o fallaría por casualidad.
 
+## Capturas del manual de usuario
+```bash
+docker compose up -d db mail files
+pnpm build
+pnpm manual:capturas
+```
+`apps/e2e/manual/capturas.spec.ts` recorre la aplicación como un cliente nuevo y regenera las imágenes de [`docs/manual/img`](manual/img). Usa su propio entorno (puertos 3300/3301, base `cumplia_e2e_manual` y el almacenamiento de archivos de desarrollo). Correlo cuando cambie la interfaz y revisá las imágenes antes de hacer el commit.
+
+Las compilaciones de la web para las pruebas y el manual van a `apps/web/.next-e2e` y `.next-manual` (variable `NEXT_DIST_DIR`): no pisan la de quien usa la app en su máquina.
+
 ## CI (GitHub Actions)
 - **verify**: instalación con lockfile congelado, build, lint, typecheck, tests y `pnpm audit`.
 - **e2e**: Postgres y Mailpit como servicios, Chromium con sus dependencias y la suite de Playwright. Si algo falla, sube el reporte con capturas y trazas (7 días).

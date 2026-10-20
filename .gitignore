@@ -3,6 +3,7 @@ dist/
 coverage/
 # Next.js (se generan al compilar o con `next typegen`)
 .next/
+.next-*/
 next-env.d.ts
 *.tsbuildinfo
 .env

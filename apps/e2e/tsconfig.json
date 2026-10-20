@@ -3,5 +3,5 @@
   "compilerOptions": {
     "noEmit": true
   },
-  "include": ["env.ts", "playwright.config.ts", "scripts", "tests"]
+  "include": ["env.ts", "playwright.config.ts", "playwright.manual.config.ts", "scripts", "tests", "manual"]
 }
