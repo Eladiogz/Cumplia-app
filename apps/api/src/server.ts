@@ -1,6 +1,7 @@
 import { createDb, rowLevelSecurityBypassReasons } from "@cumplia/db";
 import { buildApp } from "./app.js";
-import { createSmtpMailer } from "./email/mailer.js";
+import { createLogMailer, createSmtpMailer } from "./email/mailer.js";
+import { createOutbox, deriveOutboxKey } from "./email/outbox.js";
 import { createS3Storage } from "./storage/storage.js";
 import { parseEncryptionKey } from "./security/encryption.js";
 import { createDevTenantResolver, createSessionTenantResolver, firstOf } from "./tenant.js";
@@ -28,8 +29,16 @@ if (rlsBypass.length > 0) {
 // En desarrollo, Mailpit (docker compose) o, si no hay SMTP_URL, el log de la API.
 const smtpUrl = process.env.SMTP_URL;
 if (isProd && !smtpUrl) throw new Error("Falta SMTP_URL: en producción los emails deben enviarse de verdad");
-const mailer = smtpUrl ? createSmtpMailer(smtpUrl, process.env.MAIL_FROM ?? "Cumplia <no-reply@cumplia.local>") : undefined;
-if (!mailer) console.warn("ADVERTENCIA: sin SMTP_URL, los emails (con sus links) se escriben en el log.");
+const smtp = smtpUrl ? createSmtpMailer(smtpUrl, process.env.MAIL_FROM ?? "Cumplia <no-reply@cumplia.local>") : undefined;
+if (!smtp) console.warn("ADVERTENCIA: sin SMTP_URL, los emails (con sus links) se escriben en el log.");
+// Todo email pasa por la cola (cifrado en la base): si el SMTP falla, se reintenta.
+const outbox = createOutbox({
+  db,
+  key: deriveOutboxKey(mfaEncryptionKey),
+  transport: smtp ?? { send: (message) => createLogMailer(app.log).send(message) },
+  onError: ({ id, attempts, error, final }) =>
+    app.log[final ? "error" : "warn"]({ emailId: id, attempts, error }, final ? "Email descartado tras reintentos" : "Email no enviado, se reintentará"),
+});
 
 // Archivos de evidencia en un almacenamiento S3 (AWS, R2, Backblaze; SeaweedFS en desarrollo).
 const s3Bucket = process.env.S3_BUCKET;
@@ -84,16 +93,23 @@ const app = buildApp({
   apiRateLimit: positiveInt("API_RATE_LIMIT"),
   mfaEncryptionKey,
   allowedOrigins,
-  mailer,
+  mailer: outbox.mailer,
   appUrl: process.env.APP_URL ?? allowedOrigins[0],
   storage,
 });
 app.addHook("onClose", async () => {
+  await outbox.stop();
   await pool.end();
 });
 
 const port = Number(process.env.PORT ?? 3000);
-app.listen({ port, host: "0.0.0.0" }).catch((err) => {
-  app.log.error(err);
-  process.exit(1);
-});
+app
+  .listen({ port, host: "0.0.0.0" })
+  .then(() => {
+    outbox.start(); // reintentos y emails que quedaron pendientes de un arranque anterior
+    void outbox.flush();
+  })
+  .catch((err) => {
+    app.log.error(err);
+    process.exit(1);
+  });
