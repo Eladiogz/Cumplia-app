@@ -5,7 +5,7 @@
   "description": "Plataforma de cumplimiento (GRC) para pymes y consultores de LATAM",
   "packageManager": "pnpm@9.15.9",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "build": "pnpm -r build",
