@@ -3,10 +3,11 @@
 Cumplia guarda información sensible de cumplimiento de sus clientes: la seguridad es requisito de diseño. El aislamiento entre organizaciones está en [Multi-tenant](tenancy.md); para reportar una vulnerabilidad, ver [SECURITY.md](../SECURITY.md).
 
 ## Autenticación y sesiones
-- Sesiones en el servidor con cookie `httpOnly` + `SameSite=Lax` (y `Secure` en producción). En la base solo se guarda el **hash** del token (256 bits aleatorios): una filtración de la base no permite secuestrar sesiones, y se pueden revocar al instante.
+- Sesiones en el servidor con cookie `httpOnly` + `SameSite=Lax` (y `Secure` en producción o si la web es `https://`). En la base solo se guarda el **hash** del token (256 bits aleatorios): una filtración de la base no permite secuestrar sesiones, y se pueden revocar al instante.
+- Una sesión vence a los **7 días** o tras **12 horas sin uso**, lo que ocurra primero: una computadora compartida u olvidada no queda abierta.
 - Contraseñas con **scrypt** (N=2^16).
 - Bloqueo de cuenta tras **5 intentos fallidos** (15 minutos, con aviso por email). El error es idéntico para usuario inexistente y clave incorrecta.
-- Límite de peticiones por IP: 10/minuto en registro, ingreso y MFA; 100/minuto en el resto (configurables, ver [Operación](operations.md)).
+- Límite de peticiones por IP: 10/minuto en registro, ingreso y MFA; 100/minuto en el resto (configurables). **Requiere un proxy inverso delante de la web que agregue la IP real** (ver [Operación](operations.md#producción)).
 - **CSRF**: además de `SameSite`, las peticiones que modifican datos desde un `Origin` que no está en `APP_ORIGIN` se rechazan (403).
 - **Sesiones activas**: cada sesión guarda el navegador y la IP con que se abrió, y su última actividad (actualizada como mucho cada 5 minutos). Solo la propia persona las ve; puede cerrar una o todas las demás. Se borran al vencer.
 - Auditoría de altas, accesos correctos, fallidos y cierres de sesión.
@@ -37,7 +38,7 @@ Definida una sola vez en `@cumplia/core/password` (la web guía con medidor y li
 ## Navegador: Content Security Policy
 - `apps/web/src/proxy.ts` genera un **nonce aleatorio por página** y solo corren los `<script>` que lo traen (`'strict-dynamic'`, sin `unsafe-inline` ni `unsafe-eval` en producción). Un script inyectado por XSS no conoce el nonce y el navegador lo bloquea.
 - Además: `object-src 'none'`, `frame-ancestors 'none'`, `base-uri` y `form-action 'self'`, y datos solo hacia el mismo origen. Los atributos `style="…"` se permiten (`style-src-attr`): no ejecutan código.
-- Cabeceras: `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy` sin cámara, micrófono ni ubicación. La API usa helmet.
+- Cabeceras: `Strict-Transport-Security`, `Cross-Origin-Opener-Policy: same-origin`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy` sin cámara, micrófono ni ubicación. La API usa helmet.
 
 ## Archivos de evidencia
 - Solo **PNG, JPG, WebP y PDF**, hasta **10 MB**. El tipo se detecta por el **contenido** (firma del archivo): un SVG o HTML disfrazado de imagen se rechaza.
@@ -49,7 +50,7 @@ Definida una sola vez en `@cumplia/core/password` (la web guía con medidor y li
 ## Datos e inyecciones
 - Todas las entradas se validan con esquemas (zod) en la API; las consultas van parametrizadas (Drizzle).
 - Excel: los textos de los usuarios siempre como celdas de **texto** (sin inyección de fórmulas).
-- Emails: los datos de los usuarios se escapan en el HTML.
+- Emails: los datos de los usuarios se escapan en el HTML. Los nombres de organización y de personas (que aparecen en los emails) **no pueden contener links**, y cada organización puede enviar como mucho **20 invitaciones por hora**: Cumplia no sirve para mandar spam o phishing desde su dominio.
 - Cola de emails: el contenido (con links y tokens) se guarda **cifrado** (AES-256-GCM, clave derivada con HKDF y atada a cada fila) y se borra al enviarse.
 
 ## Auditoría
@@ -57,6 +58,7 @@ Definida una sola vez en `@cumplia/core/password` (la web guía con medidor y li
 - `audit_logs` es inalterable: un trigger impide modificarla o borrarla y el rol de la API no tiene esos permisos.
 
 ## Cadena de suministro
-- Dependencias con versión fijada y `pnpm install --frozen-lockfile` en CI; `pnpm audit` en cada build.
+- Dependencias con versión fijada y `pnpm install --frozen-lockfile` en CI; `pnpm audit` en cada build (las dependencias de producción, sin vulnerabilidades conocidas).
+- Quedan dos avisos en herramientas de **desarrollo** que no llegan a producción: `braces` (vía el plugin de ESLint de Next, sin parche publicado; solo afecta al lint) y `esbuild` dentro de drizzle-kit (afecta a su servidor de desarrollo, que no se usa).
 - CodeQL y Dependabot en GitHub.
 - Sin secretos en el repositorio (`.env` ignorado).

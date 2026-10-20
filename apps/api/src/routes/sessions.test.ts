@@ -135,6 +135,17 @@ describe("sesiones activas de la cuenta", () => {
     expect(again!.lastSeenAt.getTime()).toBe(recent.getTime());
   });
 
+  it("una sesión sin uso por más de 12 horas deja de valer (aunque no haya vencido)", async () => {
+    const a = await register();
+    expect((await call("GET", "/auth/me", a.cookie)).statusCode).toBe(200);
+    await ctx.db
+      .update(schema.sessions)
+      .set({ lastSeenAt: new Date(Date.now() - 13 * 60 * 60_000) })
+      .where(eq(schema.sessions.userId, a.userId));
+    expect((await call("GET", "/auth/me", a.cookie)).statusCode).toBe(401);
+    expect((await call("GET", "/assessments", a.cookie)).statusCode).toBe(401);
+  });
+
   it("sin sesión responde 401", async () => {
     expect((await call("GET", "/auth/sessions")).statusCode).toBe(401);
     expect((await call("POST", "/auth/sessions/revoke-others")).statusCode).toBe(401);

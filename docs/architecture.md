@@ -20,7 +20,7 @@ Navegador ──► Web (Next.js, :3001) ──/api/*──► API (Fastify, :30
                 └── páginas (render por petición, CSP con nonce)
 ```
 - El navegador **solo habla con la web**. La web reenvía `/api/*` a la API (rewrite de Next.js): mismo origen, sin CORS, y la cookie de sesión `httpOnly` viaja sola.
-- La API confía en `X-Forwarded-For` solo si viene del proxy (`TRUST_PROXY`), así los límites por IP son por cliente real.
+- La API confía en `X-Forwarded-For` solo si viene del proxy (`TRUST_PROXY`). El proxy `/api` de Next.js **reenvía esa cabecera tal como llega y no agrega la IP del cliente**: por eso, en producción, delante de la web tiene que haber un **proxy inverso** que agregue la IP real (ver [Operación](operations.md#producción)). Sin él, los límites por IP no distinguen clientes y la IP se puede falsificar.
 - **Quien decide siempre es la API**: la web solo muestra u oculta controles según el rol.
 
 ## Datos

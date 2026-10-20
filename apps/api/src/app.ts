@@ -20,7 +20,7 @@ import { MFA_CHALLENGE_PATH } from "./security/session.js";
 import type { TenantResolver } from "./tenant.js";
 
 const AssessmentBody = z.object({
-  answers: z.array(AnswerSchema),
+  answers: z.array(AnswerSchema).max(500),
   targetMaturity: z.number().int().min(1).max(4).default(3),
 });
 
@@ -91,9 +91,27 @@ export function buildApp({
     }
   });
 
+  // Detrás de un proxy de confianza, cada petición debería traer la IP real del cliente.
+  // Si no llega, todos comparten la IP del proxy (un atacante puede bloquear el ingreso de
+  // todos) y, si la web está expuesta sin un proxy inverso delante, el cliente podría
+  // elegir su IP mandando X-Forwarded-For. Se avisa una vez en el log.
+  if (trustProxy) {
+    let warned = false;
+    app.addHook("onRequest", async (req) => {
+      if (warned || req.url === "/health" || req.headers["x-forwarded-for"]) return;
+      warned = true;
+      req.log.warn(
+        "Llegan peticiones del proxy sin X-Forwarded-For: los límites de intentos no distinguen clientes. " +
+          "Poné un proxy inverso (nginx, Caddy o el balanceador de la nube) delante de la web que agregue la IP real. Ver docs/operations.md.",
+      );
+    });
+  }
+
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof ZodError) {
-      return reply.code(400).send({ error: "Solicitud inválida", details: err.flatten() });
+      // Las reglas propias (refine) traen un mensaje pensado para la persona: se muestra ese.
+      const custom = err.issues.find((i) => i.code === "custom");
+      return reply.code(400).send({ error: custom?.message ?? "Solicitud inválida", details: err.flatten() });
     }
     if (err instanceof WeakPasswordError) {
       return reply.code(400).send({ error: err.message, code: "WEAK_PASSWORD", rules: err.rules });

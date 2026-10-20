@@ -87,7 +87,9 @@ const app = buildApp({
   publicPathPrefix: process.env.API_PUBLIC_PREFIX ?? "",
   db,
   resolveTenant: devTenant ? firstOf(session, createDevTenantResolver(db)) : session,
-  secureCookies: isProd,
+  // Secure también si la web es HTTPS aunque falte NODE_ENV=production: un olvido de
+  // configuración no debe dejar la cookie de sesión viajando sin cifrar.
+  secureCookies: isProd || allowedOrigins.every((o) => o.startsWith("https://")),
   // Por IP y por minuto. Por defecto 10 (ingreso/registro/MFA) y 100 (resto); las pruebas E2E los suben.
   authRateLimit: positiveInt("AUTH_RATE_LIMIT"),
   apiRateLimit: positiveInt("API_RATE_LIMIT"),

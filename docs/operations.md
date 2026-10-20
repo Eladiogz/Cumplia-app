@@ -47,11 +47,17 @@ docker compose exec db psql -U cumplia -d cumplia -c "DO \$\$ BEGIN IF NOT EXIST
 | `API_URL` | A dónde reenvía la web `/api/*`. Se lee **al compilar** (`next build`) y al arrancar |
 
 ## Producción
-- **HTTPS obligatorio** delante de la web (las cookies son `Secure`), con HSTS en el balanceador o proxy.
+- **Proxy inverso obligatorio delante de la web** (nginx, Caddy o el balanceador de la nube) que termine HTTPS y **agregue o reemplace** `X-Forwarded-For` con la IP real del cliente. La web nunca se expone directamente a internet: el proxy `/api` de Next.js reenvía `X-Forwarded-For` tal como llega, así que sin un proxy delante cualquiera podría elegir qué IP ve la API (y saltear los límites de intentos), y sin la cabecera todos los clientes compartirían la misma IP. La API avisa en el log si recibe peticiones del proxy sin esa cabecera. Ejemplo con nginx: `proxy_set_header X-Forwarded-For $remote_addr;`.
+- **HTTPS obligatorio**: las cookies son `Secure` (también si `APP_ORIGIN` es `https://`, aunque falte `NODE_ENV`). La web envía HSTS.
 - **Base de datos**: creá el rol `cumplia_app` antes de migrar si el usuario de migraciones no tiene `CREATEROLE`, y un usuario de login para la API con `GRANT cumplia_app TO <usuario>`. La API **no arranca** si su conexión se saltearía RLS. Las migraciones que modifiquen datos de tablas con RLS deben fijar `app.organization_id` o correr como superusuario.
 - **Obligatorios al arrancar con `NODE_ENV=production`**: `SMTP_URL`, `S3_BUCKET` (el bucket debe existir), `MFA_ENCRYPTION_KEY`, y una conexión que respete RLS.
 - **Secretos** (`MFA_ENCRYPTION_KEY`, credenciales de base, SMTP y S3) en un gestor de secretos, nunca en el repositorio ni en la imagen.
 - **Respaldos** de PostgreSQL y del bucket de evidencia, cifrados y probados (restaurar periódicamente). La clave `MFA_ENCRYPTION_KEY` se respalda aparte.
+- **Base de datos** en red privada (sin acceso público) y con TLS en la conexión (`?sslmode=verify-full` en `DATABASE_URL`); disco cifrado.
+- **Bucket** privado (sin acceso público, sin listados), con versionado y cifrado.
+- **Email**: dominio remitente con SPF, DKIM y DMARC (si no, las invitaciones y los links de recuperación terminan en spam o se pueden suplantar).
+- **Varias instancias de la API**: los límites de intentos se cuentan por instancia (en memoria). Con más de una, conviene un almacén compartido (Redis) para `@fastify/rate-limit`.
+- **Monitoreo**: alertar ante muchos `auth.login_failed`, bloqueos de cuenta, errores 5xx y emails descartados de la cola.
 
 ## Emails
 - Todo email (invitaciones, recuperación de contraseña, avisos de seguridad) se guarda primero en la tabla `email_outbox` y un proceso de la API lo envía. Si el SMTP falla, **no se pierde**: se reintenta con espera creciente (1, 2, 4… hasta 60 minutos; 8 intentos, unas 2 horas). La petición responde sin esperar al servidor de correo.

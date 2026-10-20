@@ -11,6 +11,10 @@ const securityHeaders = [
   // El token de invitación va en el fragmento (#), que nunca viaja en el Referer; igual no se envía.
   { key: "Referrer-Policy", value: "no-referrer" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  // Solo HTTPS por un año (el navegador lo ignora en http://localhost).
+  { key: "Strict-Transport-Security", value: "max-age=31536000" },
+  // Una ventana abierta desde otro sitio no puede manipular la de Cumplia (ni al revés).
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
 ];
 
 const config: NextConfig = {
