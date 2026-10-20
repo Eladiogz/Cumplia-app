@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test:e2e": "playwright test",
+    "manual": "E2E_API_PORT=3300 E2E_WEB_PORT=3301 E2E_DB_NAME=cumplia_e2e_manual playwright test -c playwright.manual.config.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {

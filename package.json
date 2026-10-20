@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "typecheck": "pnpm -r typecheck",
     "test:e2e": "pnpm --filter @cumplia/e2e test:e2e",
+    "manual:capturas": "pnpm --filter @cumplia/e2e manual",
     "dev:api": "pnpm --filter @cumplia/api dev",
     "dev:web": "pnpm --filter @cumplia/web dev"
   },

@@ -18,6 +18,9 @@ const securityHeaders = [
 ];
 
 const config: NextConfig = {
+  // Las compilaciones de pruebas y del manual van a su propia carpeta (NEXT_DIST_DIR):
+  // así no pisan la de quien está usando la app en su máquina.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
   experimental: {
     // Evidencia de hasta 10 MB + el "sobre" multipart: el valor por defecto (10 MB) la cortaría.

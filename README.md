@@ -27,6 +27,7 @@ Abrí **http://localhost:3001**. Los emails se ven en Mailpit: http://localhost:
 ## Documentación
 | Documento | Contenido |
 |---|---|
+| [**Manual de usuario**](docs/manual/README.md) | Uso de la aplicación paso a paso, con capturas |
 | [Arquitectura](docs/architecture.md) | Monorepo, componentes, flujo de una petición, datos y decisiones de diseño |
 | [Funcionalidades](docs/features.md) | Evaluación, resultados, SoA, evidencia y registro de riesgos |
 | [Multi-tenant](docs/tenancy.md) | Cómo se aíslan las organizaciones, roles, invitaciones y organización activa |
