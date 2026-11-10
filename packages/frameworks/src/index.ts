@@ -11,7 +11,7 @@ export const FrameworkSchema = z.object({
   id: z.string(),
   name: z.string(),
   version: z.string(),
-  domains: z.record(z.string()),
+  domains: z.record(z.string(), z.string()),
   controls: z.array(ControlSchema).min(1),
 });
 
