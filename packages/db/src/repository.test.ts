@@ -219,11 +219,9 @@ describe("Row-Level Security", () => {
 
   it("no deja escribir, modificar ni borrar filas de otra organización", async () => {
     const { a, b, asm } = await seedA();
-    await asTenant(b.id, async (tx) => {
-      expect(await errorOf(tx.insert(assessments).values({ organizationId: a.id, frameworkId: "iso27001-2022" }))).toMatch(
-        /row-level security/,
-      );
-    });
+    // El rechazo aborta la transacción (Postgres no deja confirmarla): va en una propia.
+    const inserted = asTenant(b.id, (tx) => tx.insert(assessments).values({ organizationId: a.id, frameworkId: "iso27001-2022" }));
+    expect(await errorOf(inserted)).toMatch(/row-level security/);
     // UPDATE/DELETE sobre filas invisibles no afectan nada.
     const updated = await asTenant(b.id, (tx) => tx.update(assessments).set({ targetMaturity: 1 }).where(eq(assessments.id, asm.id)).returning());
     const deleted = await asTenant(b.id, (tx) => tx.delete(assessments).where(eq(assessments.id, asm.id)).returning());
